@@ -6,4 +6,4 @@ python-jose[cryptography]==3.3.0
 python-multipart==0.0.18
 pydantic==2.10.3
 pydantic-settings==2.6.1
-pillow==11.0.0
+pillow==12.2.0
