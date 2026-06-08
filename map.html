@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>SIGMAp</title>
+  <title>graffmap</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -389,6 +389,79 @@
       height: 100%;
     }
 
+    /* Tag buttons in popup */
+    .popup-tags {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+    .tag-btn {
+      padding: 3px 10px;
+      font-size: 11px;
+      border-radius: 12px;
+      border: 1px solid #555;
+      background: #2a2a2a;
+      color: #909090;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .tag-btn:hover {
+      border-color: #f59e0b;
+      color: #f59e0b;
+    }
+    .tag-btn.active {
+      background: #3a2a1a;
+      border-color: #f59e0b;
+      color: #f59e0b;
+      font-weight: 600;
+    }
+
+    /* Tags inside Lightbox */
+    .lb-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+      padding: 10px 0 4px;
+    }
+
+    /* Tag filter inline in controls */
+    .tag-filter-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .tag-filter-label {
+      font-size: 12px;
+      color: #707070;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .tag-filter-btn {
+      padding: 3px 12px;
+      font-size: 12px;
+      border-radius: 12px;
+      border: 1px solid #3a3a3a;
+      background: #2a2a2a;
+      color: #909090;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .tag-filter-btn:hover {
+      border-color: #f59e0b;
+      color: #f59e0b;
+    }
+    .tag-filter-btn.active {
+      background: #3a2a1a;
+      border-color: #f59e0b;
+      color: #f59e0b;
+      font-weight: 600;
+    }
+
   </style>
 </head>
 <body>
@@ -409,9 +482,14 @@
         <input type="checkbox" id="showAllCheckbox" checked>
         <label for="showAllCheckbox">Show all</label>
       </div>
+      <div class="tag-filter-row">
+        <span class="tag-filter-label">Tags:</span>
+        <div id="tagFilterSection" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      </div>
+      <div id="stats">Loading...</div>
       <button class="view-toggle-button" id="viewToggle">🔥 Heatmap</button>
       <button class="random-button" id="randomButton">Random</button>
-      <div id="stats">Loading...</div>
+      <a href="/gallery.html" class="view-toggle-button" style="text-decoration:none">📷 Galerie</a>
     </div>
   </div>
 
@@ -436,6 +514,7 @@
         lng: parseFloat(params.get('lng')) || 13.79,
         zoom: parseInt(params.get('zoom')) || 12,
         month: params.get('month') || null,
+        file:  params.get('file')  || null,
         view: params.get('view') || 'markers'  // 'markers' or 'heatmap'
       };
     }
@@ -494,6 +573,68 @@
     var heatLayer = null; // Heatmap layer
     var isHeatmapView = false; // Current view mode
     var selectedMonths = new Set(); // Track selected months for multi-selection
+
+    // ── Tagging ───────────────────────────────────────────────────────────────
+    var PREDEFINED_TAGS = ['graffiti', 'sticker', 'tag', 'streetart'];
+
+    // Tag storage: localStorage-backed, interface designed to be swappable for API
+    var tagStore = {
+      _cache: null,
+      _load: function() {
+        if (!this._cache) {
+          try { this._cache = JSON.parse(localStorage.getItem('graffmap_tags') || '{}'); }
+          catch(e) { this._cache = {}; }
+        }
+        return this._cache;
+      },
+      _save: function() {
+        localStorage.setItem('graffmap_tags', JSON.stringify(this._cache));
+      },
+      getTagsForFile: function(filename) {
+        return this._load()[filename] || [];
+      },
+      toggleTag: function(filename, tag) {
+        var data = this._load();
+        var tags = (data[filename] || []).slice();
+        var idx = tags.indexOf(tag);
+        if (idx === -1) tags.push(tag); else tags.splice(idx, 1);
+        data[filename] = tags;
+        this._save();
+        return tags;
+      },
+      exportToFile: function() {
+        var blob = new Blob([JSON.stringify(this._load(), null, 2)], {type: 'application/json'});
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = 'graffmap_tags.json';
+        document.body.appendChild(a); a.click();
+        setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+      },
+      importFromFile: function(file) {
+        var reader = new FileReader();
+        var self = this;
+        reader.onload = function(e) {
+          try {
+            self._cache = JSON.parse(e.target.result);
+            self._save();
+            refreshTagFilterUI();
+            applyTagFilter();
+          } catch(err) { alert('Ungültige Tags-Datei.'); }
+        };
+        reader.readAsText(file);
+      }
+    };
+
+    var selectedTagFilter = new Set(); // Active tag filters
+
+    // Shared click handler for tag buttons (used via addEventListener)
+    window._sigTagToggle = function(e) {
+      var btn = e.currentTarget;
+      tagStore.toggleTag(btn.dataset.filename, btn.dataset.tag);
+      btn.classList.toggle('active');
+      if (selectedTagFilter.size > 0) applyTagFilter();
+    };
+    // ─────────────────────────────────────────────────────────────────────────
 
     // UI Elements
     var timeSlider = document.getElementById('timeSlider');
@@ -604,6 +745,7 @@
         statsDiv.textContent = 'Showing all ' + allMarkers.length.toLocaleString() + ' photos';
         timeSlider.disabled = true;
         monthMarkersDiv.style.opacity = '0.4';
+        applyTagFilter();
         return;
       }
 
@@ -647,6 +789,7 @@
         statsDiv.textContent = 'Showing ' + visibleCount.toLocaleString() + ' of ' +
                                allMarkers.length.toLocaleString() + ' photos';
       }
+      applyTagFilter();
     }
 
     // Update heatmap view
@@ -707,6 +850,15 @@
         }
       }
 
+      // Apply tag filter to heatmap data (server tags take priority; personal tags as fallback)
+      if (selectedTagFilter.size > 0) {
+        var activeTags = Array.from(selectedTagFilter);
+        photosToShow = photosToShow.filter(function(photo) {
+          var tags = (photo.serverTags || []).concat(tagStore.getTagsForFile(photo.filename));
+          return activeTags.some(function(t) { return tags.indexOf(t) !== -1; });
+        });
+      }
+
       // Create heatmap data: [lat, lng, intensity]
       var heatData = photosToShow.map(function(photo) {
         return [photo.lat, photo.lng, 0.3];
@@ -750,8 +902,107 @@
       }
     }
 
+    // Tracks markers currently hidden by the tag filter (for fast delta updates)
+    var tagHiddenMarkers = new Set();
+
+    // Apply tag filter using bulk add/removeLayers to avoid per-marker cluster recalc
+    function applyTagFilter() {
+      var activeTags = Array.from(selectedTagFilter);
+
+      var toRemoveByGroup = {};
+      var toAddByGroup   = {};
+
+      allMarkers.forEach(function(marker) {
+        var tags    = (marker.serverTags || []).concat(tagStore.getTagsForFile(marker.filename));
+        var matches = activeTags.length === 0 ||
+          activeTags.some(function(t) { return tags.indexOf(t) !== -1; });
+        var hidden  = tagHiddenMarkers.has(marker);
+
+        if (!matches && !hidden) {
+          tagHiddenMarkers.add(marker);
+          var ym = marker.yearMonth;
+          if (!toRemoveByGroup[ym]) toRemoveByGroup[ym] = [];
+          toRemoveByGroup[ym].push(marker);
+        } else if (matches && hidden) {
+          tagHiddenMarkers.delete(marker);
+          var ym = marker.yearMonth;
+          if (!toAddByGroup[ym]) toAddByGroup[ym] = [];
+          toAddByGroup[ym].push(marker);
+        }
+      });
+
+      // One cluster recalc per group, not per marker
+      Object.keys(toRemoveByGroup).forEach(function(ym) {
+        monthLayerGroups[ym].removeLayers(toRemoveByGroup[ym]);
+      });
+      Object.keys(toAddByGroup).forEach(function(ym) {
+        monthLayerGroups[ym].addLayers(toAddByGroup[ym]);
+      });
+    }
+
+    // Refresh active-state on tag filter buttons (called after import)
+    function refreshTagFilterUI() {
+      document.querySelectorAll('.tag-filter-btn').forEach(function(btn) {
+        btn.classList.toggle('active', selectedTagFilter.has(btn.dataset.tag));
+      });
+    }
+
+    // Inject tag buttons into the open Lightbox
+    function injectLightboxTags(filename) {
+      var lbData = document.querySelector('#lightbox .lb-data');
+      if (!lbData) return;
+      var old = lbData.querySelector('.lb-tags');
+      if (old) old.remove();
+
+      var tagsDiv = document.createElement('div');
+      tagsDiv.className = 'lb-tags';
+
+      // Server-side tags (set by admin) — shown as read-only amber badges
+      var marker = allMarkers.find(function(m) { return m.filename === filename; });
+      var serverTags = (marker && marker.serverTags) || [];
+      if (serverTags.length > 0) {
+        serverTags.forEach(function(tag) {
+          var badge = document.createElement('span');
+          badge.className = 'tag-btn active';
+          badge.textContent = tag;
+          badge.title = 'Admin-Tag (global)';
+          badge.style.cursor = 'default';
+          tagsDiv.appendChild(badge);
+        });
+      }
+
+      // Personal tags (localStorage) — toggleable by user
+      var currentTags = tagStore.getTagsForFile(filename);
+      PREDEFINED_TAGS.forEach(function(tag) {
+        if (serverTags.indexOf(tag) !== -1) return; // already shown above
+        var btn = document.createElement('button');
+        btn.className = 'tag-btn' + (currentTags.indexOf(tag) !== -1 ? ' active' : '');
+        btn.textContent = tag;
+        btn.title = 'Persönlicher Tag (nur für dich)';
+        btn.addEventListener('click', function() {
+          tagStore.toggleTag(filename, tag);
+          btn.classList.toggle('active');
+          if (selectedTagFilter.size > 0) applyTagFilter();
+        });
+        tagsDiv.appendChild(btn);
+      });
+      lbData.appendChild(tagsDiv);
+    }
+
+    // Watch lb-image src changes to update tags when user navigates in Lightbox
+    function setupLightboxTagObserver() {
+      var lbImg = document.querySelector('#lightbox .lb-image');
+      if (!lbImg) return;
+      new MutationObserver(function() {
+        if (lbImg.src) {
+          var filename = decodeURIComponent(lbImg.src.split('/').pop());
+          injectLightboxTags(filename);
+        }
+      }).observe(lbImg, { attributes: true, attributeFilter: ['src'] });
+    }
+
     // GeoJSON laden
-    fetch('photos.geojson')
+    fetch('photos_dedubbed.geojson')
       .then(response => response.json())
       .then(data => {
         var yearMonths = new Set();
@@ -771,7 +1022,9 @@
           allPhotos.push({
             lat: coords[1],
             lng: coords[0],
-            yearMonth: yearMonth
+            yearMonth: yearMonth,
+            filename: feature.properties.filename,
+            serverTags: feature.properties.tags || []
           });
 
           // Create cluster group for this month if it doesn't exist
@@ -843,44 +1096,45 @@
                 }
 
                 markers.forEach(function(marker, index) {
-                  if (marker.thumbPath && galleryItems[index]) {
-                    var img = document.createElement('img');
-                    img.src = marker.thumbPath;
-                    img.alt = marker.filename;
-                    img.title = marker.filename + '\n' + marker.datetime;
+                  if (!marker.thumbPath || !galleryItems[index]) return;
 
-                    // Click handler to open in lightbox
-                    galleryItems[index].addEventListener('click', function() {
-                      // Create links for ALL images in proper order for lightbox gallery
-                      var tempLinks = [];
+                  var item = galleryItems[index];
 
-                      // Add all markers in order, starting with clicked one
-                      markers.forEach(function(m, i) {
-                        var link = document.createElement('a');
-                        link.href = m.originalPath;
-                        link.setAttribute('data-lightbox', 'cluster-gallery-' + Date.now()); // Unique gallery ID
-                        link.setAttribute('data-title', m.filename + ' - ' + m.datetime);
-                        link.style.display = 'none';
-                        document.body.appendChild(link);
-                        tempLinks.push(link);
-                      });
-
-                      // Click the selected image's link to open lightbox
-                      tempLinks[index].click();
-
-                      // Clean up temporary links after lightbox opens
-                      setTimeout(function() {
-                        tempLinks.forEach(function(link) {
-                          if (link.parentNode) {
-                            document.body.removeChild(link);
-                          }
-                        });
-                      }, 500);
+                  function openInLightbox() {
+                    var galleryId = 'cluster-gallery-' + Date.now();
+                    var tempLinks = [];
+                    markers.forEach(function(m, i) {
+                      var link = document.createElement('a');
+                      link.href = m.originalPath;
+                      link.setAttribute('data-lightbox', galleryId);
+                      link.setAttribute('data-title', m.filename + ' - ' + m.datetime);
+                      link.style.display = 'none';
+                      document.body.appendChild(link);
+                      tempLinks.push(link);
                     });
-
-                    galleryItems[index].innerHTML = '';
-                    galleryItems[index].appendChild(img);
+                    tempLinks[index].click();
+                    setTimeout(function() {
+                      tempLinks.forEach(function(link) {
+                        if (link.parentNode) document.body.removeChild(link);
+                      });
+                    }, 500);
                   }
+
+                  var img = document.createElement('img');
+                  img.alt = marker.filename;
+                  img.title = marker.filename + '\n' + marker.datetime;
+
+                  // Put img in DOM immediately so browser can render progressively
+                  item.innerHTML = '';
+                  item.onclick = null;  // Clear any handler from previous open
+                  item.appendChild(img);
+
+                  // Only enable click after image is loaded (prevents broken lightbox)
+                  // Use onclick (not addEventListener) so re-opening cluster doesn't stack handlers
+                  img.onload  = function() { item.onclick = openInLightbox; };
+                  img.onerror = function() { item.onclick = openInLightbox; };
+
+                  img.src = marker.thumbPath;
                 });
               }, 50);
             });
@@ -896,6 +1150,9 @@
           marker.originalPath = feature.properties.original || feature.properties.thumb;  // Full quality for lightbox
           marker.filename = feature.properties.filename;
           marker.datetime = feature.properties.datetime;
+          marker.serverTags = feature.properties.tags || [];
+          marker.yearMonth = yearMonth;
+          marker.clusterGroup = monthLayerGroups[yearMonth];
 
           // Create popup WITHOUT image initially (loads on demand)
           marker.bindPopup(
@@ -909,22 +1166,14 @@
           marker.on('popupopen', function(e) {
             var popup = e.popup;
             var popupContent = popup.getElement();
-
-            // Check if image already loaded
             if (popupContent.querySelector('.popup-img')) return;
-
-            // Create image element - use THUMBNAIL for popup, but link to full size for lightbox
             if (this.thumbPath) {
               var imgHtml = "<a href='" + this.originalPath + "' data-lightbox='gallery' data-title='" +
                            this.filename + " - " + this.datetime + "'>" +
                            "<img class='popup-img' src='" + this.thumbPath + "' loading='eager'>" +
                            "</a>";
-
-              // Replace loading message with image
               var loadingDiv = popupContent.querySelector('.popup-loading');
-              if (loadingDiv) {
-                loadingDiv.outerHTML = imgHtml;
-              }
+              if (loadingDiv) loadingDiv.outerHTML = imgHtml;
             }
           });
 
@@ -1096,6 +1345,42 @@
 
         // Initial map update
         updateMap();
+
+        // Auto-open marker when arriving from gallery link (?file=FILENAME)
+        if (urlParams.file) {
+          var targetMarker = allMarkers.find(function(m) {
+            return m.filename === urlParams.file;
+          });
+          if (targetMarker) {
+            targetMarker.clusterGroup.zoomToShowLayer(targetMarker, function() {
+              targetMarker.openPopup();
+            });
+          }
+        }
+
+        // Build tag filter buttons
+        var tagFilterSection = document.getElementById('tagFilterSection');
+        PREDEFINED_TAGS.forEach(function(tag) {
+          var btn = document.createElement('button');
+          btn.className = 'tag-filter-btn';
+          btn.textContent = tag;
+          btn.dataset.tag = tag;
+          btn.addEventListener('click', function() {
+            var t = this.dataset.tag;
+            if (selectedTagFilter.has(t)) {
+              selectedTagFilter.delete(t);
+              this.classList.remove('active');
+            } else {
+              selectedTagFilter.add(t);
+              this.classList.add('active');
+            }
+            updateMap();
+          });
+          tagFilterSection.appendChild(btn);
+        });
+
+        // Hook tag injection into Lightbox
+        setupLightboxTagObserver();
 
         // Update URL when map moves or zooms
         map.on('moveend', updateURL);

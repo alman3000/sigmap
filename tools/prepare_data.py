@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SIGMAp Parallel Data Preparation
+graffmap Parallel Data Preparation
 Uses multiple CPU cores to process photos in parallel - much faster!
 """
 
@@ -17,11 +17,16 @@ from PIL import Image
 
 
 def get_photo_files(photo_dir):
-    """Get all photo files."""
+    """Get all photo files (deduplicated — NTFS is case-insensitive)."""
     print(f"Scanning {photo_dir}...")
+    seen = set()
     files = []
-    for ext in ['jpg', 'jpeg', 'JPG', 'JPEG']:
-        files.extend(glob.glob(os.path.join(photo_dir, '**', f'*.{ext}'), recursive=True))
+    for ext in ['jpg', 'jpeg']:
+        for f in glob.glob(os.path.join(photo_dir, '**', f'*.{ext}'), recursive=True):
+            key = os.path.normcase(os.path.abspath(f))
+            if key not in seen:
+                seen.add(key)
+                files.append(f)
     return files
 
 

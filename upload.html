@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>graffmap · Upload</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #1a1a1a;
+      color: #e5e7eb;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem 4rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      color: #f59e0b;
+    }
+    header p {
+      margin-top: .3rem;
+      color: #6b7280;
+      font-size: .875rem;
+    }
+    header a {
+      color: #6b7280;
+      text-decoration: none;
+      font-size: .75rem;
+    }
+    header a:hover { color: #f59e0b; }
+
+    /* ── Password card ─────────────────────────────────────────────────────── */
+    #passwordSection {
+      width: 100%;
+      max-width: 380px;
+    }
+    .card {
+      background: #242424;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 2rem;
+      text-align: center;
+    }
+    .lock-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+    .card p {
+      color: #9ca3af;
+      font-size: .9rem;
+      margin-bottom: 1.25rem;
+    }
+    .input-row {
+      display: flex;
+      gap: .5rem;
+    }
+    input[type="password"], input[type="text"] {
+      flex: 1;
+      background: #111;
+      border: 1px solid #444;
+      border-radius: 8px;
+      color: #e5e7eb;
+      font-size: .95rem;
+      padding: .55rem .85rem;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input[type="password"]:focus, input[type="text"]:focus {
+      border-color: #f59e0b;
+    }
+    .btn-primary {
+      background: #f59e0b;
+      border: none;
+      border-radius: 8px;
+      color: #111;
+      cursor: pointer;
+      font-size: .95rem;
+      font-weight: 600;
+      padding: .55rem 1.2rem;
+      transition: background .15s;
+      white-space: nowrap;
+    }
+    .btn-primary:hover { background: #fbbf24; }
+    .btn-primary:disabled { background: #78350f; color: #6b7280; cursor: not-allowed; }
+
+    .error-msg {
+      color: #ef4444;
+      font-size: .82rem;
+      margin-top: .75rem;
+      min-height: 1.2em;
+    }
+
+    /* ── Upload section ────────────────────────────────────────────────────── */
+    #uploadSection {
+      width: 100%;
+      max-width: 640px;
+    }
+
+    /* Drop zone */
+    #dropZone {
+      position: relative;
+      background: #242424;
+      border: 2px dashed #444;
+      border-radius: 12px;
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      user-select: none;
+    }
+    #dropZone:hover, #dropZone.drag-over {
+      border-color: #f59e0b;
+      background: #1f1a0e;
+    }
+    #dropZone svg {
+      width: 48px;
+      height: 48px;
+      color: #6b7280;
+      margin-bottom: .75rem;
+    }
+    #dropZone.drag-over svg { color: #f59e0b; }
+    #dropZone .dz-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #d1d5db;
+    }
+    #dropZone .dz-hint {
+      font-size: .83rem;
+      color: #6b7280;
+      margin-top: .3rem;
+    }
+    #dropZone .dz-formats {
+      font-size: .75rem;
+      color: #4b5563;
+      margin-top: .5rem;
+    }
+    #fileInput {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── File list ─────────────────────────────────────────────────────────── */
+    #fileList {
+      margin-top: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+    }
+
+    .file-row {
+      background: #242424;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: .7rem 1rem;
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      grid-template-rows: auto auto;
+      gap: .25rem .75rem;
+      align-items: center;
+    }
+    .file-name {
+      font-size: .88rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      grid-column: 1;
+      grid-row: 1;
+    }
+    .file-size {
+      font-size: .78rem;
+      color: #6b7280;
+      grid-column: 2;
+      grid-row: 1;
+      white-space: nowrap;
+    }
+    .file-status {
+      font-size: .78rem;
+      grid-column: 3;
+      grid-row: 1;
+      white-space: nowrap;
+      text-align: right;
+      min-width: 80px;
+    }
+    .file-status.queued    { color: #6b7280; }
+    .file-status.uploading { color: #f59e0b; }
+    .file-status.done      { color: #22c55e; }
+    .file-status.error     { color: #ef4444; }
+    .file-status.skipped   { color: #ef4444; }
+    .file-status.no-gps    { color: #f59e0b; }
+
+    .progress-wrap {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      background: #333;
+      border-radius: 4px;
+      height: 4px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: #f59e0b;
+      border-radius: 4px;
+      width: 0%;
+      transition: width .1s linear;
+    }
+    .progress-bar.done  { background: #22c55e; }
+    .progress-bar.error { background: #ef4444; }
+
+    /* ── Location picker ───────────────────────────────────────────────────── */
+    .location-picker {
+      background: #1e1e1e;
+      border: 1px solid #f59e0b;
+      border-radius: 8px;
+      padding: .85rem;
+      margin-top: .25rem;
+    }
+    .loc-title {
+      font-size: .8rem;
+      color: #f59e0b;
+      font-weight: 600;
+      margin-bottom: .6rem;
+    }
+    .loc-search-wrap {
+      position: relative;
+      margin-bottom: .5rem;
+    }
+    .loc-search-wrap input {
+      width: 100%;
+      background: #111;
+      border: 1px solid #444;
+      border-radius: 6px;
+      color: #e5e7eb;
+      font-size: .85rem;
+      padding: .45rem .75rem;
+      outline: none;
+    }
+    .loc-search-wrap input:focus { border-color: #f59e0b; }
+    .loc-suggestions {
+      position: absolute;
+      top: 100%;
+      left: 0; right: 0;
+      background: #1a1a1a;
+      border: 1px solid #555;
+      border-radius: 6px;
+      margin-top: 2px;
+      max-height: 160px;
+      overflow-y: auto;
+      z-index: 9999;
+    }
+    .loc-suggestion-item {
+      padding: .45rem .75rem;
+      font-size: .78rem;
+      color: #e5e7eb;
+      cursor: pointer;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .loc-suggestion-item:last-child { border-bottom: none; }
+    .loc-suggestion-item:hover { background: #2a2a2a; }
+    .loc-map {
+      height: 240px;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid #333;
+    }
+    .loc-coords {
+      font-size: .75rem;
+      color: #9ca3af;
+      margin-top: .5rem;
+      min-height: 1.1em;
+    }
+    .loc-confirm-btn {
+      margin-top: .6rem;
+      width: 100%;
+      padding: .5rem;
+      background: #f59e0b;
+      border: none;
+      border-radius: 6px;
+      color: #111;
+      font-size: .88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .loc-confirm-btn:hover:not(:disabled) { background: #fbbf24; }
+    .loc-confirm-btn:disabled { background: #78350f; color: #6b7280; cursor: not-allowed; }
+
+    /* ── Footer ────────────────────────────────────────────────────────────── */
+    .footer-row {
+      margin-top: 1.25rem;
+      font-size: .82rem;
+      color: #4b5563;
+    }
+
+    .summary {
+      font-size: .82rem;
+      color: #6b7280;
+    }
+    .summary .ok  { color: #22c55e; }
+    .summary .err { color: #ef4444; }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>graffmap · Upload</h1>
+  <p>Passwortgeschützter Foto-Upload &nbsp;·&nbsp; <a href="/">Zur Karte</a></p>
+</header>
+
+<!-- ── Password gate ──────────────────────────────────────────────────────── -->
+<div id="passwordSection">
+  <div class="card">
+    <div class="lock-icon">🔒</div>
+    <p>Gib das Upload-Passwort ein</p>
+    <div class="input-row">
+      <input type="password" id="passwordInput" placeholder="Passwort" autocomplete="current-password" />
+      <button class="btn-primary" onclick="unlock()">Entsperren</button>
+    </div>
+    <div id="passwordError" class="error-msg"></div>
+  </div>
+</div>
+
+<!-- ── Upload zone ────────────────────────────────────────────────────────── -->
+<div id="uploadSection" class="hidden">
+
+  <div id="dropZone">
+    <input type="file" id="fileInput" multiple accept=".jpg,.jpeg,.heic,.heif" />
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+      <path stroke-linecap="round" stroke-linejoin="round"
+        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+    </svg>
+    <div class="dz-title">Fotos hier ablegen</div>
+    <div class="dz-hint">oder klicken zum Auswählen</div>
+    <div class="dz-formats">JPEG · HEIC · HEIF &nbsp;·&nbsp; max. 50 MB pro Datei</div>
+  </div>
+
+  <div id="fileList"></div>
+
+  <div class="footer-row">
+    <span id="summaryText" class="summary"></span>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const ALLOWED_EXT = new Set(['.jpg', '.jpeg', '.heic', '.heif']);
+  const MAX_CONCURRENT = 3;
+
+  let queue = [];
+  let active = 0;
+  let doneCount = 0;
+  let errorCount = 0;
+  let mapCounter = 0;
+
+  // ── Password / session ────────────────────────────────────────────────────
+
+  function getPassword() {
+    return sessionStorage.getItem('upload_pw') || '';
+  }
+
+  function unlock() {
+    const pw = document.getElementById('passwordInput').value.trim();
+    if (!pw) return;
+    sessionStorage.setItem('upload_pw', pw);
+    document.getElementById('passwordError').textContent = '';
+    showUploadSection();
+  }
+
+  function lockAndReset(errorText) {
+    sessionStorage.removeItem('upload_pw');
+    document.getElementById('passwordInput').value = '';
+    document.getElementById('passwordError').textContent = errorText || '';
+    document.getElementById('fileList').innerHTML = '';
+    document.getElementById('summaryText').innerHTML = '';
+    queue = [];
+    active = 0;
+    doneCount = 0;
+    errorCount = 0;
+    document.getElementById('uploadSection').classList.add('hidden');
+    document.getElementById('passwordSection').classList.remove('hidden');
+  }
+
+  function showUploadSection() {
+    document.getElementById('passwordSection').classList.add('hidden');
+    document.getElementById('uploadSection').classList.remove('hidden');
+  }
+
+  if (getPassword()) showUploadSection();
+
+  document.getElementById('passwordInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') unlock();
+  });
+
+  // ── Drop zone ─────────────────────────────────────────────────────────────
+
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+
+  fileInput.addEventListener('change', () => addFiles(fileInput.files));
+
+  let dragCounter = 0;
+  dropZone.addEventListener('dragenter', e => {
+    e.preventDefault();
+    dragCounter++;
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', () => {
+    dragCounter--;
+    if (dragCounter <= 0) { dragCounter = 0; dropZone.classList.remove('drag-over'); }
+  });
+  dropZone.addEventListener('dragover', e => e.preventDefault());
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dragCounter = 0;
+    dropZone.classList.remove('drag-over');
+    addFiles(e.dataTransfer.files);
+  });
+
+  // ── File queue ────────────────────────────────────────────────────────────
+
+  function addFiles(files) {
+    if (!files || !files.length) return;
+    Array.from(files).forEach(file => {
+      const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+      const item = buildRow(file);
+      if (!ALLOWED_EXT.has(ext)) {
+        item.statusEl.textContent = 'Nicht unterstützt';
+        item.statusEl.className = 'file-status skipped';
+        item.barEl.className = 'progress-bar error';
+        item.barEl.style.width = '100%';
+        return;
+      }
+      queue.push(item);
+      tick();
+    });
+    fileInput.value = '';
+  }
+
+  function tick() {
+    while (active < MAX_CONCURRENT && queue.length) {
+      const item = queue.shift();
+      active++;
+      upload(item);
+    }
+  }
+
+  function buildRow(file) {
+    const row = document.createElement('div');
+    row.className = 'file-row';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'file-name';
+    nameEl.textContent = file.name;
+    nameEl.title = file.name;
+
+    const sizeEl = document.createElement('div');
+    sizeEl.className = 'file-size';
+    sizeEl.textContent = fmtSize(file.size);
+
+    const statusEl = document.createElement('div');
+    statusEl.className = 'file-status queued';
+    statusEl.textContent = 'Warteschlange';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'progress-wrap';
+    const barEl = document.createElement('div');
+    barEl.className = 'progress-bar';
+    wrap.appendChild(barEl);
+
+    row.appendChild(nameEl);
+    row.appendChild(sizeEl);
+    row.appendChild(statusEl);
+    row.appendChild(wrap);
+
+    document.getElementById('fileList').appendChild(row);
+    return { file, rowEl: row, barEl, statusEl };
+  }
+
+  // ── XHR upload with progress ──────────────────────────────────────────────
+
+  function upload(item) {
+    item.statusEl.textContent = 'Wird hochgeladen…';
+    item.statusEl.className = 'file-status uploading';
+
+    const pw = getPassword();
+    const formData = new FormData();
+    formData.append('file', item.file);
+
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.addEventListener('progress', e => {
+      if (e.lengthComputable) {
+        item.barEl.style.width = Math.round(e.loaded / e.total * 100) + '%';
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      active--;
+      if (xhr.status === 200) {
+        item.barEl.style.width = '100%';
+        let data = {};
+        try { data = JSON.parse(xhr.responseText); } catch {}
+
+        if (data.needs_location) {
+          item.barEl.className = 'progress-bar';
+          item.barEl.style.background = '#f59e0b';
+          item.statusEl.textContent = 'Standort fehlt';
+          item.statusEl.className = 'file-status no-gps';
+          createLocationPicker(item, data.photo_id);
+        } else {
+          item.barEl.className = 'progress-bar done';
+          item.statusEl.textContent = 'Fertig';
+          item.statusEl.className = 'file-status done';
+          doneCount++;
+          updateSummary();
+        }
+      } else if (xhr.status === 401) {
+        item.barEl.style.width = '100%';
+        item.barEl.className = 'progress-bar error';
+        item.statusEl.textContent = 'Falsches Passwort';
+        item.statusEl.className = 'file-status error';
+        errorCount++;
+        lockAndReset('Falsches Passwort — bitte erneut eingeben.');
+        return;
+      } else {
+        let msg = 'Fehler ' + xhr.status;
+        try { msg = JSON.parse(xhr.responseText).detail || msg; } catch {}
+        item.barEl.style.width = '100%';
+        item.barEl.className = 'progress-bar error';
+        item.statusEl.textContent = msg;
+        item.statusEl.className = 'file-status error';
+        errorCount++;
+        updateSummary();
+      }
+      tick();
+    });
+
+    xhr.addEventListener('error', () => {
+      active--;
+      item.barEl.style.width = '100%';
+      item.barEl.className = 'progress-bar error';
+      item.statusEl.textContent = 'Netzwerkfehler';
+      item.statusEl.className = 'file-status error';
+      errorCount++;
+      updateSummary();
+      tick();
+    });
+
+    xhr.open('POST', '/api/upload');
+    xhr.setRequestHeader('Authorization', 'Basic ' + btoa('upload:' + pw));
+    xhr.send(formData);
+  }
+
+  // ── Location picker ───────────────────────────────────────────────────────
+
+  function createLocationPicker(item, photoId) {
+    const mapId = 'loc-map-' + (++mapCounter);
+
+    const picker = document.createElement('div');
+    picker.className = 'location-picker';
+
+    picker.innerHTML = `
+      <div class="loc-title">Standort setzen — kein GPS im Bild gefunden</div>
+      <div class="loc-search-wrap">
+        <input type="text" placeholder="Adresse suchen oder Karte klicken…" autocomplete="off" />
+        <div class="loc-suggestions hidden"></div>
+      </div>
+      <div class="loc-map" id="${mapId}"></div>
+      <div class="loc-coords">Noch kein Standort gewählt</div>
+      <button class="loc-confirm-btn" disabled>Standort bestätigen</button>
+    `;
+
+    // Insert directly after the file row
+    item.rowEl.insertAdjacentElement('afterend', picker);
+
+    const searchInput   = picker.querySelector('input');
+    const suggestionsEl = picker.querySelector('.loc-suggestions');
+    const coordsEl      = picker.querySelector('.loc-coords');
+    const confirmBtn    = picker.querySelector('.loc-confirm-btn');
+
+    let selectedLat = null, selectedLon = null;
+    let leafMap = null, leafMarker = null;
+
+    // Init Leaflet after the element is in the DOM
+    requestAnimationFrame(() => {
+      leafMap = L.map(mapId, { zoomControl: true }).setView([48.137, 11.575], 10);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
+      }).addTo(leafMap);
+
+      leafMap.on('click', e => setLocation(e.latlng.lat, e.latlng.lng));
+    });
+
+    function setLocation(lat, lng) {
+      selectedLat = lat;
+      selectedLon = lng;
+      if (leafMarker) leafMap.removeLayer(leafMarker);
+      leafMarker = L.marker([lat, lng]).addTo(leafMap);
+      if (leafMap.getZoom() < 13) leafMap.setView([lat, lng], 14);
+      coordsEl.textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
+      confirmBtn.disabled = false;
+    }
+
+    // Nominatim address search
+    let searchTimer;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      const q = searchInput.value.trim();
+      if (q.length < 3) { hideSuggestions(); return; }
+      searchTimer = setTimeout(() => nominatimSearch(q), 400);
+    });
+
+    searchInput.addEventListener('keydown', e => {
+      if (e.key === 'Escape') hideSuggestions();
+    });
+
+    document.addEventListener('click', e => {
+      if (!picker.contains(e.target)) hideSuggestions();
+    }, { capture: true });
+
+    async function nominatimSearch(q) {
+      try {
+        const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=5&q=' + encodeURIComponent(q);
+        const resp = await fetch(url, { headers: { 'Accept-Language': 'de' } });
+        const results = await resp.json();
+        suggestionsEl.innerHTML = '';
+        if (!results.length) { hideSuggestions(); return; }
+        results.forEach(r => {
+          const div = document.createElement('div');
+          div.className = 'loc-suggestion-item';
+          div.textContent = r.display_name;
+          div.addEventListener('click', () => {
+            searchInput.value = r.display_name;
+            hideSuggestions();
+            setLocation(parseFloat(r.lat), parseFloat(r.lon));
+          });
+          suggestionsEl.appendChild(div);
+        });
+        suggestionsEl.classList.remove('hidden');
+      } catch { hideSuggestions(); }
+    }
+
+    function hideSuggestions() {
+      suggestionsEl.classList.add('hidden');
+    }
+
+    // Confirm button
+    confirmBtn.addEventListener('click', async () => {
+      if (selectedLat === null) return;
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Wird gespeichert…';
+
+      try {
+        const pw = getPassword();
+        const resp = await fetch('/api/upload/locate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Basic ' + btoa('upload:' + pw),
+          },
+          body: JSON.stringify({ photo_id: photoId, lat: selectedLat, lon: selectedLon }),
+        });
+
+        if (resp.ok) {
+          picker.remove();
+          item.barEl.className = 'progress-bar done';
+          item.barEl.style.background = '';
+          item.barEl.style.width = '100%';
+          item.statusEl.textContent = 'Fertig';
+          item.statusEl.className = 'file-status done';
+          doneCount++;
+          updateSummary();
+        } else if (resp.status === 401) {
+          lockAndReset('Falsches Passwort — bitte erneut eingeben.');
+        } else {
+          let msg = 'Fehler beim Speichern';
+          try { msg = (await resp.json()).detail || msg; } catch {}
+          confirmBtn.textContent = msg;
+          confirmBtn.disabled = false;
+        }
+      } catch {
+        confirmBtn.textContent = 'Netzwerkfehler – erneut versuchen';
+        confirmBtn.disabled = false;
+      }
+    });
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  function updateSummary() {
+    const el = document.getElementById('summaryText');
+    const parts = [];
+    if (doneCount)  parts.push(`<span class="ok">${doneCount} hochgeladen</span>`);
+    if (errorCount) parts.push(`<span class="err">${errorCount} fehlgeschlagen</span>`);
+    el.innerHTML = parts.join(' · ');
+  }
+
+  function fmtSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>graffmap Admin</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:     #1a1a1a;
+      --bg2:    #252525;
+      --bg3:    #2e2e2e;
+      --border: #3a3a3a;
+      --text:   #e0e0e0;
+      --muted:  #888;
+      --amber:  #f59e0b;
+      --amber2: #d97706;
+      --green:  #22c55e;
+      --red:    #ef4444;
+      --yellow: #eab308;
+    }
+
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+    /* ── login ─────────────────────────────────────────────────────────── */
+    #login-screen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh;
+    }
+    .login-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 40px; width: 360px;
+    }
+    .login-card h1 { color: var(--amber); font-size: 1.6rem; margin-bottom: 8px; }
+    .login-card p  { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+    .login-card input[type="email"] {
+      width: 100%; padding: 10px 14px; background: var(--bg3);
+      border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); font-size: 15px; margin-bottom: 12px;
+      outline: none;
+    }
+    .login-card input[type="email"]:focus { border-color: var(--amber); }
+    .btn-primary {
+      width: 100%; padding: 11px; background: var(--amber); color: #1a1a1a;
+      border: none; border-radius: 6px; font-size: 15px; font-weight: 700;
+      cursor: pointer; transition: background .15s;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--amber2); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    #login-msg { margin-top: 14px; font-size: 13px; min-height: 20px; }
+    #login-msg.ok    { color: var(--green); }
+    #login-msg.error { color: var(--red); }
+
+    /* ── admin shell ───────────────────────────────────────────────────── */
+    #admin-screen { display: none; }
+
+    header {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--bg2); border-bottom: 1px solid var(--border);
+      padding: 12px 24px; display: flex; align-items: center; gap: 16px;
+    }
+    header h1 { color: var(--amber); font-size: 1.2rem; flex: 1; }
+    .stats { display: flex; gap: 12px; font-size: 13px; color: var(--muted); }
+    .stats span { white-space: nowrap; }
+    .stats b { color: var(--text); }
+
+    .btn-sm {
+      padding: 6px 14px; border-radius: 6px; font-size: 13px;
+      font-weight: 600; cursor: pointer; border: 1px solid var(--border);
+      background: var(--bg3); color: var(--text); transition: background .15s;
+    }
+    .btn-sm:hover { background: var(--border); }
+    .btn-sm.amber { background: var(--amber); color: #1a1a1a; border-color: var(--amber); }
+    .btn-sm.amber:hover { background: var(--amber2); }
+
+    /* ── filter bar ────────────────────────────────────────────────────── */
+    #filter-bar {
+      padding: 12px 24px; display: flex; align-items: center; gap: 8px;
+      border-bottom: 1px solid var(--border); flex-wrap: wrap;
+    }
+    .filter-btn {
+      padding: 5px 14px; border-radius: 20px; font-size: 13px;
+      cursor: pointer; border: 1px solid var(--border);
+      background: var(--bg3); color: var(--muted); transition: all .15s;
+    }
+    .filter-btn:hover  { border-color: var(--amber); color: var(--text); }
+    .filter-btn.active { background: var(--amber); color: #1a1a1a; border-color: var(--amber); font-weight: 700; }
+
+    /* ── photo grid ────────────────────────────────────────────────────── */
+    #photo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px; padding: 24px;
+    }
+
+    .photo-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 10px; overflow: hidden; display: flex; flex-direction: column;
+      transition: border-color .15s;
+    }
+    .photo-card:hover { border-color: #555; }
+    .photo-card.status-approved { border-left: 3px solid var(--green); }
+    .photo-card.status-rejected { border-left: 3px solid var(--red); opacity: .7; }
+    .photo-card.status-pending  { border-left: 3px solid var(--yellow); }
+
+    .card-thumb {
+      width: 100%; aspect-ratio: 1; object-fit: cover;
+      background: var(--bg3); display: block;
+    }
+    .card-thumb-placeholder {
+      width: 100%; aspect-ratio: 1; background: var(--bg3);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--muted); font-size: 12px;
+    }
+
+    .card-body { padding: 10px; flex: 1; display: flex; flex-direction: column; gap: 8px; }
+
+    .card-filename { font-size: 11px; color: var(--muted); word-break: break-all; }
+    .card-datetime { font-size: 11px; color: var(--muted); }
+
+    /* GPS badge */
+    .badge-no-gps {
+      display: inline-block;
+      font-size: 10px; font-weight: 700;
+      background: #7c2d12; color: #fca5a5;
+      border-radius: 4px; padding: 2px 6px;
+    }
+
+    /* tag buttons */
+    .card-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+    .tag-btn {
+      padding: 2px 8px; border-radius: 12px; font-size: 11px; cursor: pointer;
+      border: 1px solid var(--border); background: var(--bg3); color: var(--muted);
+      transition: all .15s;
+    }
+    .tag-btn:hover { border-color: var(--amber); color: var(--text); }
+    .tag-btn.active { background: var(--amber); color: #1a1a1a; border-color: var(--amber); font-weight: 700; }
+
+    /* status actions */
+    .card-actions { display: flex; gap: 6px; margin-top: auto; flex-wrap: wrap; }
+    .action-btn {
+      flex: 1; padding: 5px 0; border-radius: 5px; font-size: 12px;
+      font-weight: 600; cursor: pointer; border: 1px solid var(--border);
+      background: var(--bg3); color: var(--muted); transition: all .15s;
+    }
+    .action-btn:hover:not(:disabled)   { background: var(--border); color: var(--text); }
+    .action-btn:disabled               { opacity: .4; cursor: not-allowed; }
+    .action-btn.active-approve { background: var(--green); color: #fff; border-color: var(--green); }
+    .action-btn.active-reject  { background: var(--red);   color: #fff; border-color: var(--red); }
+
+    .gps-btn {
+      width: 100%; padding: 5px 0; border-radius: 5px; font-size: 12px;
+      font-weight: 600; cursor: pointer; border: 1px solid var(--amber);
+      background: transparent; color: var(--amber); transition: all .15s;
+    }
+    .gps-btn:hover { background: var(--amber); color: #1a1a1a; }
+
+    /* ── load more ─────────────────────────────────────────────────────── */
+    #load-more-row {
+      text-align: center; padding: 24px;
+      display: none;
+    }
+
+    /* ── empty state ───────────────────────────────────────────────────── */
+    #empty-state {
+      text-align: center; padding: 80px 24px; color: var(--muted); display: none;
+    }
+
+    /* ── toast ─────────────────────────────────────────────────────────── */
+    #toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 18px; font-size: 13px;
+      opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 9999;
+    }
+    #toast.show { opacity: 1; }
+    #toast.ok   { border-color: var(--green); color: var(--green); }
+    #toast.err  { border-color: var(--red);   color: var(--red); }
+
+    /* ── GPS modal ─────────────────────────────────────────────────────── */
+    #geo-modal {
+      position: fixed; inset: 0; z-index: 10000;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .geo-overlay {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,.65);
+    }
+    .geo-dialog {
+      position: relative; z-index: 1;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 24px;
+      width: min(560px, 95vw);
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .geo-dialog h3 { color: var(--amber); font-size: 1rem; }
+    .geo-search-wrap { position: relative; }
+    .geo-search-wrap input {
+      width: 100%; padding: 8px 12px;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font-size: 14px; outline: none;
+    }
+    .geo-search-wrap input:focus { border-color: var(--amber); }
+    #geo-suggestions {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: var(--bg); border: 1px solid #555;
+      border-radius: 6px; margin-top: 2px;
+      max-height: 160px; overflow-y: auto; z-index: 9999;
+    }
+    .geo-sug-item {
+      padding: 7px 12px; font-size: 12px; color: var(--text);
+      cursor: pointer; border-bottom: 1px solid var(--bg3);
+    }
+    .geo-sug-item:last-child { border-bottom: none; }
+    .geo-sug-item:hover { background: var(--bg3); }
+    #geo-map { height: 320px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+    #geo-coords { font-size: 12px; color: var(--muted); min-height: 18px; }
+    .geo-footer { display: flex; gap: 8px; justify-content: flex-end; }
+  </style>
+</head>
+<body>
+
+<!-- ── Login screen ──────────────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-card">
+    <h1>graffmap Admin</h1>
+    <p>Gib deine E-Mail-Adresse ein um einen Login-Link zu erhalten.</p>
+    <input type="email" id="email-input" placeholder="admin@example.com" />
+    <button class="btn-primary" id="send-btn">Login-Link senden</button>
+    <div id="login-msg"></div>
+  </div>
+</div>
+
+<!-- ── Admin screen ──────────────────────────────────────────────────────── -->
+<div id="admin-screen">
+
+  <header>
+    <h1>graffmap Admin</h1>
+    <div class="stats" id="stats-bar">
+      <span>Gesamt: <b id="st-total">–</b></span>
+      <span>Pending: <b id="st-pending">–</b></span>
+      <span>Approved: <b id="st-approved">–</b></span>
+      <span>Rejected: <b id="st-rejected">–</b></span>
+    </div>
+    <button class="btn-sm amber" id="regen-btn" title="GeoJSON neu generieren">↻ GeoJSON</button>
+    <a class="btn-sm" href="/gallery.html" style="text-decoration:none">📷 Galerie</a>
+    <a class="btn-sm" href="/upload.html" style="text-decoration:none">↑ Upload</a>
+    <button class="btn-sm" id="logout-btn">Logout</button>
+  </header>
+
+  <div id="filter-bar">
+    <span style="font-size:13px;color:var(--muted);margin-right:4px">Filter:</span>
+    <button class="filter-btn active" data-status="">Alle</button>
+    <button class="filter-btn" data-status="pending">Pending</button>
+    <button class="filter-btn" data-status="approved">Approved</button>
+    <button class="filter-btn" data-status="rejected">Rejected</button>
+  </div>
+
+  <div id="photo-grid"></div>
+  <div id="empty-state">Keine Fotos gefunden.</div>
+  <div id="load-more-row">
+    <button class="btn-sm" id="load-more-btn">Mehr laden</button>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<!-- ── GPS modal ─────────────────────────────────────────────────────────── -->
+<div id="geo-modal" style="display:none">
+  <div class="geo-overlay" id="geo-overlay"></div>
+  <div class="geo-dialog">
+    <h3>Standort setzen</h3>
+    <div class="geo-search-wrap">
+      <input type="text" id="geo-search" placeholder="Adresse suchen oder Karte klicken…" autocomplete="off" />
+      <div id="geo-suggestions" style="display:none"></div>
+    </div>
+    <div id="geo-map"></div>
+    <div id="geo-coords">Noch kein Standort gewählt</div>
+    <div class="geo-footer">
+      <button class="btn-sm" id="geo-cancel-btn">Abbrechen</button>
+      <button class="btn-sm amber" id="geo-save-btn" disabled>Speichern</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const TAGS = ['graffiti', 'sticker', 'tag', 'streetart'];
+const PAGE_SIZE = 48;
+
+let currentStatus = '';
+let offset = 0;
+let total = 0;
+
+// ── GPS modal state ──────────────────────────────────────────────────────────
+let geoPhotoId   = null;
+let geoLat       = null;
+let geoLon       = null;
+let geoMap       = null;
+let geoMarker    = null;
+let geoCardEl    = null;
+let geoPhotoObj  = null;
+
+// ── Auth check ───────────────────────────────────────────────────────────────
+async function checkAuth() {
+  try {
+    const r = await fetch('/api/auth/me', { credentials: 'include' });
+    if (r.ok) {
+      showAdmin();
+    } else {
+      showLogin();
+    }
+  } catch {
+    showLogin();
+  }
+}
+
+function showLogin()  { document.getElementById('login-screen').style.display = 'flex'; }
+function showAdmin()  {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('admin-screen').style.display = 'block';
+  loadStats();
+  loadPhotos(true);
+}
+
+// ── Login ────────────────────────────────────────────────────────────────────
+document.getElementById('send-btn').addEventListener('click', async () => {
+  const email = document.getElementById('email-input').value.trim();
+  const msg   = document.getElementById('login-msg');
+  const btn   = document.getElementById('send-btn');
+  if (!email) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Sende…';
+  msg.className = '';
+  msg.textContent = '';
+
+  try {
+    const r = await fetch('/api/auth/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await r.json();
+    if (r.ok) {
+      msg.className = 'ok';
+      msg.textContent = data.message;
+    } else {
+      msg.className = 'error';
+      msg.textContent = data.detail || 'Fehler';
+    }
+  } catch {
+    msg.className = 'error';
+    msg.textContent = 'Verbindungsfehler';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Login-Link senden';
+  }
+});
+
+document.getElementById('email-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('send-btn').click();
+});
+
+// ── Logout ───────────────────────────────────────────────────────────────────
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  location.reload();
+});
+
+// ── Stats ────────────────────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const r = await fetch('/api/admin/stats', { credentials: 'include' });
+    if (!r.ok) return;
+    const d = await r.json();
+    document.getElementById('st-total').textContent    = d.total;
+    document.getElementById('st-pending').textContent  = d.pending;
+    document.getElementById('st-approved').textContent = d.approved;
+    document.getElementById('st-rejected').textContent = d.rejected;
+  } catch {}
+}
+
+// ── Filter ───────────────────────────────────────────────────────────────────
+document.getElementById('filter-bar').addEventListener('click', e => {
+  const btn = e.target.closest('.filter-btn');
+  if (!btn) return;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentStatus = btn.dataset.status;
+  loadPhotos(true);
+});
+
+// ── Regenerate GeoJSON ───────────────────────────────────────────────────────
+document.getElementById('regen-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('regen-btn');
+  btn.disabled = true;
+  btn.textContent = '↻ …';
+  try {
+    const r = await fetch('/api/admin/regenerate', { method: 'POST', credentials: 'include' });
+    if (r.ok) toast('GeoJSON wird neu generiert', 'ok');
+    else toast('Fehler beim Regenerieren', 'err');
+  } catch { toast('Verbindungsfehler', 'err'); }
+  finally { btn.disabled = false; btn.textContent = '↻ GeoJSON'; }
+});
+
+// ── Load more ────────────────────────────────────────────────────────────────
+document.getElementById('load-more-btn').addEventListener('click', () => loadPhotos(false));
+
+// ── Photo loading ────────────────────────────────────────────────────────────
+async function loadPhotos(reset) {
+  if (reset) {
+    offset = 0;
+    total  = 0;
+    document.getElementById('photo-grid').innerHTML = '';
+    document.getElementById('empty-state').style.display = 'none';
+  }
+
+  const params = new URLSearchParams({ limit: PAGE_SIZE, offset });
+  if (currentStatus) params.set('status', currentStatus);
+
+  try {
+    const r = await fetch(`/api/admin/photos?${params}`, { credentials: 'include' });
+    if (!r.ok) { if (r.status === 401) { showLogin(); return; } return; }
+    const data = await r.json();
+    total = data.total;
+    offset += data.photos.length;
+
+    const grid = document.getElementById('photo-grid');
+    data.photos.forEach(p => grid.appendChild(buildCard(p)));
+
+    document.getElementById('empty-state').style.display =
+      (offset === 0 && data.photos.length === 0) ? 'block' : 'none';
+
+    document.getElementById('load-more-row').style.display =
+      offset < total ? 'block' : 'none';
+  } catch {}
+}
+
+// ── Card builder ─────────────────────────────────────────────────────────────
+function buildCard(photo) {
+  const card = document.createElement('div');
+  card.className = `photo-card status-${photo.status}`;
+  card.dataset.id = photo.id;
+
+  const hasLocation = photo.lat != null && photo.lon != null;
+
+  // Thumbnail
+  if (photo.thumb) {
+    const img = document.createElement('img');
+    img.className = 'card-thumb';
+    img.src = photo.thumb;
+    img.loading = 'lazy';
+    img.alt = photo.filename;
+    card.appendChild(img);
+  } else {
+    const ph = document.createElement('div');
+    ph.className = 'card-thumb-placeholder';
+    ph.textContent = 'Kein Thumbnail';
+    card.appendChild(ph);
+  }
+
+  const body = document.createElement('div');
+  body.className = 'card-body';
+
+  // Filename
+  const fn = document.createElement('div');
+  fn.className = 'card-filename';
+  fn.textContent = photo.filename;
+  body.appendChild(fn);
+
+  // Date
+  if (photo.datetime) {
+    const dt = document.createElement('div');
+    dt.className = 'card-datetime';
+    dt.textContent = photo.datetime;
+    body.appendChild(dt);
+  }
+
+  // GPS badge when missing
+  if (!hasLocation) {
+    const badge = document.createElement('span');
+    badge.className = 'badge-no-gps';
+    badge.textContent = 'GPS fehlt';
+    body.appendChild(badge);
+  }
+
+  // Tags
+  const tagsRow = document.createElement('div');
+  tagsRow.className = 'card-tags';
+  TAGS.forEach(tag => {
+    const btn = document.createElement('button');
+    btn.className = 'tag-btn' + (photo.tags.includes(tag) ? ' active' : '');
+    btn.textContent = tag;
+    btn.addEventListener('click', () => toggleTag(photo, btn, tag, tagsRow));
+    tagsRow.appendChild(btn);
+  });
+  body.appendChild(tagsRow);
+
+  // GPS setzen button (always shown — allows correcting wrong GPS too)
+  const gpsBtn = document.createElement('button');
+  gpsBtn.className = 'gps-btn';
+  gpsBtn.textContent = hasLocation
+    ? '📍 ' + photo.lat.toFixed(4) + ', ' + photo.lon.toFixed(4)
+    : '📍 Standort setzen';
+  gpsBtn.addEventListener('click', () => openGeoModal(photo, card, gpsBtn));
+  body.appendChild(gpsBtn);
+
+  // Status actions
+  const actions = document.createElement('div');
+  actions.className = 'card-actions';
+
+  ['approved', 'rejected'].forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'action-btn' + (photo.status === s ? ` active-${s}` : '');
+    btn.textContent = s === 'approved' ? '✓ OK' : '✗ Ablehnen';
+    // Prevent approval without GPS
+    if (s === 'approved' && !hasLocation) {
+      btn.disabled = true;
+      btn.title = 'GPS-Standort muss zuerst gesetzt werden';
+    }
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      setStatus(photo, s, card, btn);
+    });
+    actions.appendChild(btn);
+  });
+
+  body.appendChild(actions);
+  card.appendChild(body);
+  return card;
+}
+
+// ── Tag toggle ───────────────────────────────────────────────────────────────
+const _tagDebounce = {};
+
+function toggleTag(photo, btn, tag, tagsRow) {
+  if (photo.tags.includes(tag)) {
+    photo.tags = photo.tags.filter(t => t !== tag);
+    btn.classList.remove('active');
+  } else {
+    photo.tags.push(tag);
+    btn.classList.add('active');
+  }
+
+  clearTimeout(_tagDebounce[photo.id]);
+  _tagDebounce[photo.id] = setTimeout(() => saveTags(photo), 600);
+}
+
+async function saveTags(photo) {
+  try {
+    const r = await fetch(`/api/admin/photos/${photo.id}/tags`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tags: photo.tags }),
+    });
+    if (r.ok) toast('Tags gespeichert', 'ok');
+    else toast('Fehler beim Speichern', 'err');
+  } catch { toast('Verbindungsfehler', 'err'); }
+}
+
+// ── Status change ────────────────────────────────────────────────────────────
+async function setStatus(photo, newStatus, card, clickedBtn) {
+  try {
+    const r = await fetch(`/api/admin/photos/${photo.id}/status`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    if (!r.ok) { toast('Fehler', 'err'); return; }
+
+    photo.status = newStatus;
+
+    card.classList.remove('status-pending', 'status-approved', 'status-rejected');
+    card.classList.add(`status-${newStatus}`);
+
+    card.querySelectorAll('.action-btn').forEach(btn => {
+      btn.classList.remove('active-approved', 'active-rejected');
+    });
+    clickedBtn.classList.add(`active-${newStatus}`);
+
+    toast(newStatus === 'approved' ? 'Freigegeben' : 'Abgelehnt', 'ok');
+    loadStats();
+  } catch { toast('Verbindungsfehler', 'err'); }
+}
+
+// ── GPS modal ────────────────────────────────────────────────────────────────
+function openGeoModal(photo, cardEl, gpsBtnEl) {
+  geoPhotoId  = photo.id;
+  geoLat      = null;
+  geoLon      = null;
+  geoCardEl   = cardEl;
+  geoPhotoObj = photo;
+
+  document.getElementById('geo-coords').textContent =
+    (photo.lat != null)
+      ? 'Aktuell: ' + photo.lat.toFixed(6) + ', ' + photo.lon.toFixed(6)
+      : 'Noch kein Standort gesetzt';
+  document.getElementById('geo-save-btn').disabled = true;
+  document.getElementById('geo-search').value = '';
+  document.getElementById('geo-suggestions').style.display = 'none';
+
+  document.getElementById('geo-modal').style.display = 'flex';
+
+  // Init or re-use Leaflet map
+  requestAnimationFrame(() => {
+    if (!geoMap) {
+      geoMap = L.map('geo-map').setView([48.137, 11.575], 10);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
+      }).addTo(geoMap);
+      geoMap.on('click', e => geoSetLocation(e.latlng.lat, e.latlng.lng));
+    } else {
+      geoMap.invalidateSize();
+    }
+
+    // Show existing location if any
+    if (photo.lat != null) {
+      geoSetLocation(photo.lat, photo.lon, false);
+      geoMap.setView([photo.lat, photo.lon], 14);
+    } else {
+      if (geoMarker) { geoMap.removeLayer(geoMarker); geoMarker = null; }
+      geoMap.setView([48.137, 11.575], 10);
+    }
+  });
+}
+
+function geoSetLocation(lat, lng, updateSave = true) {
+  geoLat = lat;
+  geoLon = lng;
+  if (geoMarker) geoMap.removeLayer(geoMarker);
+  geoMarker = L.marker([lat, lng]).addTo(geoMap);
+  document.getElementById('geo-coords').textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
+  if (updateSave) document.getElementById('geo-save-btn').disabled = false;
+}
+
+function closeGeoModal() {
+  document.getElementById('geo-modal').style.display = 'none';
+}
+
+document.getElementById('geo-overlay').addEventListener('click', closeGeoModal);
+document.getElementById('geo-cancel-btn').addEventListener('click', closeGeoModal);
+
+document.getElementById('geo-save-btn').addEventListener('click', async () => {
+  if (geoLat === null || geoPhotoId === null) return;
+  const btn = document.getElementById('geo-save-btn');
+  btn.disabled = true;
+  btn.textContent = '…';
+
+  try {
+    const r = await fetch(`/api/admin/photos/${geoPhotoId}/location`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat: geoLat, lon: geoLon }),
+    });
+
+    if (r.ok) {
+      toast('Standort gespeichert', 'ok');
+      closeGeoModal();
+
+      // Update the card in-place
+      geoPhotoObj.lat = geoLat;
+      geoPhotoObj.lon = geoLon;
+
+      // Replace card with fresh one
+      const newCard = buildCard(geoPhotoObj);
+      geoCardEl.replaceWith(newCard);
+    } else {
+      toast('Fehler beim Speichern', 'err');
+    }
+  } catch {
+    toast('Verbindungsfehler', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Speichern';
+  }
+});
+
+// ── Nominatim search (admin modal) ───────────────────────────────────────────
+let _geoSearchTimer;
+document.getElementById('geo-search').addEventListener('input', () => {
+  clearTimeout(_geoSearchTimer);
+  const q = document.getElementById('geo-search').value.trim();
+  const sugEl = document.getElementById('geo-suggestions');
+  if (q.length < 3) { sugEl.style.display = 'none'; return; }
+  _geoSearchTimer = setTimeout(() => geoNominatim(q), 400);
+});
+
+document.getElementById('geo-search').addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('geo-suggestions').style.display = 'none';
+});
+
+async function geoNominatim(q) {
+  const sugEl = document.getElementById('geo-suggestions');
+  try {
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=5&q=' + encodeURIComponent(q);
+    const resp = await fetch(url, { headers: { 'Accept-Language': 'de' } });
+    const results = await resp.json();
+    sugEl.innerHTML = '';
+    if (!results.length) { sugEl.style.display = 'none'; return; }
+    results.forEach(r => {
+      const div = document.createElement('div');
+      div.className = 'geo-sug-item';
+      div.textContent = r.display_name;
+      div.addEventListener('click', () => {
+        document.getElementById('geo-search').value = r.display_name;
+        sugEl.style.display = 'none';
+        geoSetLocation(parseFloat(r.lat), parseFloat(r.lon));
+        geoMap.setView([parseFloat(r.lat), parseFloat(r.lon)], 14);
+      });
+      sugEl.appendChild(div);
+    });
+    sugEl.style.display = 'block';
+  } catch { sugEl.style.display = 'none'; }
+}
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+let _toastTimer;
+function toast(msg, type = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `show ${type}`;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { t.className = ''; }, 2000);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+checkAuth();
+</script>
+</body>
+</html>
