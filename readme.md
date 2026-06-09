@@ -350,14 +350,24 @@ curl -X POST -b "session=..." http://yourdomain.com/api/admin/regenerate-thumbna
 
 ## HTTPS on a VPS
 
-1. Point your domain's DNS A record to the VPS IP
+The stack includes a `certbot` container that shares the same Docker volumes as nginx — this is required because nginx reads from a named volume (`certbot_www`), not from the host filesystem.
+
+1. Point your domain's DNS A record to the VPS IP.
 2. Start the stack: `docker compose up -d`
-3. Issue a certificate with Certbot (runs on the host, not in Docker):
+3. Issue a certificate via the certbot container:
    ```bash
-   certbot certonly --webroot -w /path/to/graffmap --email you@domain.com -d yourdomain.com
+   docker compose run --rm certbot certbot certonly \
+     --webroot -w /var/www/certbot \
+     --email you@domain.com \
+     -d yourdomain.com \
+     --agree-tos --non-interactive
    ```
-4. Uncomment the `server { listen 443 ssl ... }` block in `nginx.conf` and fill in your domain
+4. Uncomment the `server { listen 443 ssl ... }` block in `nginx.conf`, replace `yourdomain.com` with your domain.
 5. Reload nginx: `docker compose exec nginx nginx -s reload`
+
+Renewals happen automatically — the certbot container runs `certbot renew` every 12 hours.
+
+> **Why not run certbot directly on the host?** Nginx reads the ACME challenge files from a named Docker volume (`certbot_www`), not from a host path. Running certbot on the host writes to the wrong location, causing a 404 during the challenge. The certbot container writes to the same volume nginx serves from.
 
 ---
 
