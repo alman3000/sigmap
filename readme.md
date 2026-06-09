@@ -118,6 +118,7 @@ graffmap/
 ├── photos.geojson              # Active GeoJSON served to the map
 ├── tools/
 │   ├── backup.sh                   # pg_dump backup script (see Backup & Restore)
+│   ├── restore.sh                  # Restore a .sql.gz dump into the running db container
 │
 ├── photos/                     # Original full-resolution photos
 ├── thumbnails/                 # Generated thumbnails (EXIF-corrected)
@@ -469,18 +470,16 @@ crontab -e
 ### Restore
 
 ```bash
-# Stop the app so no writes happen during restore (optional but recommended)
-docker compose stop app
+# Restore a specific dump (reads credentials from .env automatically):
+./tools/restore.sh backups/<timestamp>.sql.gz
 
-# Drop and recreate the database, then restore
-gunzip -c backups/<timestamp>.sql.gz | \
-  docker compose exec -T db psql -U graffmap graffmap
-
-# Restart
-docker compose start app
+# Bare filename also works — script looks in backups/ automatically:
+./tools/restore.sh 20260610_001052.sql.gz
 ```
 
-If you need to restore to a completely fresh volume:
+The restore script stops the app container before importing and restarts it afterwards. It prompts for confirmation before dropping the database.
+
+If you need to restore to a completely fresh volume (db container gone):
 
 ```bash
 docker compose down
