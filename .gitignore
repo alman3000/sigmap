@@ -4,10 +4,12 @@ thumbnails/
 thumbnails_preview/
 batches/
 photos
+uploads/
 # Data files - too large for git
 *.json
 *.geojson
 *.gz
+backups/
 
 # Python
 __pycache__/
@@ -34,3 +36,4 @@ desktop.ini
 .env
 todo.md
 logo.png
+docker-compose.override.yml

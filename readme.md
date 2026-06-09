@@ -114,7 +114,8 @@ graffmap/
 ├── gallery.html                # Paginated photo gallery with infinite scroll
 ├── admin.html                  # Admin moderation panel (magic link login)
 ├── upload.html                 # Password-protected photo upload page
-├── photos.geojson     # Active GeoJSON served to the map
+├── photos.geojson              # Active GeoJSON served to the map
+├── backup.sh                   # pg_dump backup script (see Backup & Restore)
 │
 ├── photos/                     # Original full-resolution photos
 ├── thumbnails/                 # Generated thumbnails (EXIF-corrected)
@@ -439,6 +440,53 @@ The stack includes a `certbot` container that shares the same Docker volumes as 
 Renewals happen automatically — the certbot container runs `certbot renew` every 12 hours.
 
 > **Why not run certbot directly on the host?** Nginx reads the ACME challenge files from a named Docker volume (`certbot_www`), not from a host path. Running certbot on the host writes to the wrong location, causing a 404 during the challenge. The certbot container writes to the same volume nginx serves from.
+
+---
+
+## Backup & Restore
+
+Database data lives in the `postgres_data` Docker volume. Use `backup.sh` to create compressed `pg_dump` snapshots.
+
+### Create a backup
+
+```bash
+./backup.sh              # writes backups/<timestamp>.sql.gz, keeps last 14
+./backup.sh --keep 30    # keep last 30 dumps instead
+```
+
+The script reads credentials from `.env` automatically and rotates old files so the `backups/` directory doesn't grow unbounded. The `backups/` directory is excluded from git.
+
+### Automate with cron (Linux/VPS)
+
+```bash
+crontab -e
+# Daily at 03:00, keep 30 days of backups:
+0 3 * * * /path/to/sigmap/backup.sh --keep 30 >> /var/log/sigmap-backup.log 2>&1
+```
+
+### Restore
+
+```bash
+# Stop the app so no writes happen during restore (optional but recommended)
+docker compose stop app
+
+# Drop and recreate the database, then restore
+gunzip -c backups/<timestamp>.sql.gz | \
+  docker compose exec -T db psql -U graffmap graffmap
+
+# Restart
+docker compose start app
+```
+
+If you need to restore to a completely fresh volume:
+
+```bash
+docker compose down
+docker volume rm sigmap_postgres_data
+docker compose up -d
+gunzip -c backups/<timestamp>.sql.gz | \
+  docker compose exec -T db psql -U graffmap graffmap
+```
 
 ---
 

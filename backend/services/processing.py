@@ -11,6 +11,7 @@ import logging
 import os
 import shutil
 import subprocess
+import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -178,8 +179,16 @@ def register_location(photo_id: int, lat: float, lon: float) -> Optional[str]:
 
 # ── GeoJSON regeneration ─────────────────────────────────────────────────────
 
+_geojson_lock = threading.Lock()
+
+
 def regenerate_geojson() -> int:
     """Write approved photos (with tags) to photos.geojson atomically."""
+    with _geojson_lock:
+        return _regenerate_geojson_locked()
+
+
+def _regenerate_geojson_locked() -> int:
     settings = get_settings()
     db = SessionLocal()
     try:
