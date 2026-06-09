@@ -85,7 +85,7 @@ def _create_thumbnail(photo_path: str, thumb_dir: str, thumb_size: int) -> Optio
 
 # ── main processing pipeline ─────────────────────────────────────────────────
 
-def process_uploaded_file(filepath: str) -> bool:
+def process_uploaded_file(filepath: str, tags: list = None) -> bool:
     """Move file from uploads/ → photos/, create thumbnail, register in DB."""
     settings = get_settings()
     filename = os.path.basename(filepath)
@@ -121,7 +121,7 @@ def process_uploaded_file(filepath: str) -> bool:
             lat=lat,
             lon=lon,
             datetime_original=meta.get("DateTimeOriginal", ""),
-            tags=[],
+            tags=tags or [],
             status=PhotoStatus.pending,
         )
         db.add(photo)

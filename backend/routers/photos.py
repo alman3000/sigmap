@@ -7,10 +7,9 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Photo, PhotoStatus
+from tags import VALID_TAGS
 
 router = APIRouter(prefix="/api/photos", tags=["photos"])
-
-VALID_TAGS = {"graffiti", "sticker", "tag", "streetart"}
 
 
 @router.get("")

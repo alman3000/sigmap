@@ -302,6 +302,41 @@
     .loc-confirm-btn:hover:not(:disabled) { background: #fbbf24; }
     .loc-confirm-btn:disabled { background: #78350f; color: #6b7280; cursor: not-allowed; }
 
+    /* ── Tag picker ────────────────────────────────────────────────────────── */
+    .tag-section {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: .5rem .75rem;
+      margin-top: 1rem;
+      padding: .65rem 1rem;
+      background: #242424;
+      border: 1px solid #333;
+      border-radius: 8px;
+    }
+    .tag-section-label {
+      font-size: .8rem;
+      color: #6b7280;
+      white-space: nowrap;
+    }
+    .upload-tag-btn {
+      background: transparent;
+      border: 1px solid #444;
+      border-radius: 6px;
+      color: #9ca3af;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: .8rem;
+      padding: .25rem .65rem;
+      transition: border-color .15s, color .15s, background .15s;
+    }
+    .upload-tag-btn:hover { border-color: #f59e0b; color: #f59e0b; }
+    .upload-tag-btn.active {
+      background: #3a2a1a;
+      border-color: #f59e0b;
+      color: #f59e0b;
+    }
+
     /* ── Footer ────────────────────────────────────────────────────────────── */
     .footer-row {
       margin-top: 1.25rem;
@@ -353,6 +388,11 @@
     <div class="dz-formats">JPEG · HEIC · HEIF &nbsp;·&nbsp; max. 50 MB pro Datei</div>
   </div>
 
+  <div class="tag-section">
+    <span class="tag-section-label">Tags:</span>
+    <div id="uploadTagBtns" style="display:flex;gap:.4rem;flex-wrap:wrap;"></div>
+  </div>
+
   <div id="fileList"></div>
 
   <div class="footer-row">
@@ -367,6 +407,32 @@
 <script>
   const ALLOWED_EXT = new Set(['.jpg', '.jpeg', '.heic', '.heif']);
   const MAX_CONCURRENT = 3;
+
+  // ── Tag selection (global: applies to all files in this batch) ────────────
+
+  let TAGS = ['graffiti', 'sticker', 'tag', 'streetart']; // fallback; replaced by /api/tags
+  const selectedTags = new Set();
+
+  fetch('/api/tags')
+    .then(r => r.json())
+    .then(d => { TAGS = d.tags; buildTagButtons(); })
+    .catch(() => buildTagButtons());
+
+  function buildTagButtons() {
+    const container = document.getElementById('uploadTagBtns');
+    container.innerHTML = '';
+    TAGS.forEach(tag => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'upload-tag-btn' + (selectedTags.has(tag) ? ' active' : '');
+      btn.textContent = tag;
+      btn.addEventListener('click', () => {
+        selectedTags.has(tag) ? selectedTags.delete(tag) : selectedTags.add(tag);
+        btn.classList.toggle('active', selectedTags.has(tag));
+      });
+      container.appendChild(btn);
+    });
+  }
 
   let queue = [];
   let active = 0;
@@ -529,6 +595,7 @@
     const pw = getPassword();
     const formData = new FormData();
     formData.append('file', item.file);
+    if (selectedTags.size) formData.append('tags', Array.from(selectedTags).join(','));
 
     const xhr = new XMLHttpRequest();
 

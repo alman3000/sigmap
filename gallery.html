@@ -246,7 +246,7 @@
         integrity="sha512-XL54SjceXZFzblziNnaFFaXggzqCuZrFS4loWPpvPJ6Kg0kc2HyL89+cPeH0GMq0sKL2SegzUmA8Lx9a0st2ow=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
-  const TAGS  = ['graffiti', 'sticker', 'tag', 'streetart'];
+  let TAGS = ['graffiti', 'sticker', 'tag', 'streetart']; // populated from /api/tags on init
   const LIMIT = 100;
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -555,8 +555,14 @@
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
-  buildTagFilter();
-  loadPage();
+  (async function() {
+    try {
+      const r = await fetch('/api/tags');
+      TAGS = (await r.json()).tags;
+    } catch {}
+    buildTagFilter();
+    loadPage();
+  })();
 </script>
 </body>
 </html>

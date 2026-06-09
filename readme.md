@@ -83,6 +83,7 @@ interactive web map for visualizing large collections of geotagged photos with c
 | `PATCH /api/admin/photos/{id}/location` | Correct GPS coordinates for a photo |
 | `POST /api/admin/regenerate` | Manually trigger GeoJSON regeneration |
 | `POST /api/admin/regenerate-thumbnails` | Recreate all thumbnails with correct EXIF orientation |
+| `GET /api/tags` | List all valid tag values |
 | `GET /api/health` | Health check |
 
 ### Upload workflow

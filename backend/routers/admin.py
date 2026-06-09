@@ -11,10 +11,9 @@ from database import get_db
 from deps import get_current_admin
 from models import Photo, PhotoStatus
 from services.processing import _create_thumbnail, regenerate_geojson
+from tags import VALID_TAGS
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-
-PREDEFINED_TAGS = ["graffiti", "sticker", "tag", "streetart"]
 
 
 # ── Pydantic schemas ─────────────────────────────────────────────────────────
@@ -91,7 +90,7 @@ def update_tags(
     db: Session = Depends(get_db),
     _: str = Depends(get_current_admin),
 ):
-    invalid = [t for t in body.tags if t not in PREDEFINED_TAGS]
+    invalid = [t for t in body.tags if t not in VALID_TAGS]
     if invalid:
         raise HTTPException(status_code=400, detail=f"Invalid tags: {invalid}")
 

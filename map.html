@@ -602,7 +602,8 @@
     var selectedMonths = new Set(); // Track selected months for multi-selection
 
     // ── Tagging ───────────────────────────────────────────────────────────────
-    var PREDEFINED_TAGS = ['graffiti', 'sticker', 'tag', 'streetart'];
+    var PREDEFINED_TAGS = ['graffiti', 'sticker', 'tag', 'streetart']; // fallback; replaced by /api/tags
+    fetch('/api/tags').then(function(r) { return r.json(); }).then(function(d) { PREDEFINED_TAGS = d.tags; }).catch(function() {});
 
     // Tag storage: localStorage-backed, interface designed to be swappable for API
     var tagStore = {

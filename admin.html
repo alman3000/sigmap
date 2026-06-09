@@ -292,7 +292,7 @@
         integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
-const TAGS = ['graffiti', 'sticker', 'tag', 'streetart'];
+let TAGS = ['graffiti', 'sticker', 'tag', 'streetart']; // populated from /api/tags on init
 const PAGE_SIZE = 48;
 
 let currentStatus = '';
@@ -563,7 +563,11 @@ async function saveTags(photo) {
       body: JSON.stringify({ tags: photo.tags }),
     });
     if (r.ok) toast('Tags gespeichert', 'ok');
-    else toast('Fehler beim Speichern', 'err');
+    else {
+      let msg = 'Fehler beim Speichern';
+      try { const e = await r.json(); if (e.detail) msg = e.detail; } catch {}
+      toast(msg, 'err');
+    }
   } catch { toast('Verbindungsfehler', 'err'); }
 }
 
@@ -736,7 +740,13 @@ function toast(msg, type = 'ok') {
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
-checkAuth();
+(async function() {
+  try {
+    const r = await fetch('/api/tags');
+    TAGS = (await r.json()).tags;
+  } catch {}
+  checkAuth();
+})();
 </script>
 </body>
 </html>

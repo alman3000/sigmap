@@ -7,12 +7,13 @@ import secrets
 import shutil
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Header, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
 from config import get_settings
 from database import SessionLocal
 from models import Photo, PhotoStatus
+from tags import VALID_TAGS
 from services.mail import send_new_photo_notification
 from services.processing import (
     _create_thumbnail,
@@ -25,9 +26,9 @@ from services.processing import (
 logger = logging.getLogger(__name__)
 
 
-def _process_notify(filepath: str) -> None:
+def _process_notify(filepath: str, tags: list = None) -> None:
     """Background task: process a GPS-tagged upload, regenerate GeoJSON, notify admins."""
-    if process_uploaded_file(filepath):
+    if process_uploaded_file(filepath, tags=tags or []):
         regenerate_geojson()
         try:
             send_new_photo_notification(os.path.basename(filepath))
@@ -74,9 +75,11 @@ class LocateRequest(BaseModel):
 async def upload_photo(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    tags: str = Form(""),
     _: None = Depends(_check_auth),
 ):
     settings = get_settings()
+    tag_list = [t for t in (t.strip() for t in tags.split(",")) if t in VALID_TAGS]
 
     filename = pathlib.Path(file.filename or "upload.jpg").name
     ext = os.path.splitext(filename)[1].lower()
@@ -131,7 +134,7 @@ async def upload_photo(
                 lat=None,
                 lon=None,
                 datetime_original="",
-                tags=[],
+                tags=tag_list,
                 status=PhotoStatus.pending,
             )
             db.add(photo)
@@ -149,7 +152,7 @@ async def upload_photo(
             "message": "Kein GPS-Standort gefunden — bitte Standort manuell setzen",
         }
 
-    background_tasks.add_task(_process_notify, dest)
+    background_tasks.add_task(_process_notify, dest, tag_list)
     return {
         "filename": filename,
         "size": size,
