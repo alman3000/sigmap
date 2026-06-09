@@ -261,6 +261,77 @@ SMTP_HOST_GATEWAY=host-gateway
 SMTP_HOST_PORT=25
 ```
 
+#### Setting up Postfix on Debian
+
+```bash
+apt install postfix libsasl2-modules
+# Choose "Internet Site" when prompted, enter your hostname (e.g. graffiti-exex.eu)
+```
+
+Find the Docker bridge IP range (typically `172.17.0.0/16` or `172.18.0.0/16`):
+
+```bash
+docker network inspect bridge | grep Subnet
+# or for the compose network:
+docker network inspect sigmap_internal | grep Subnet
+```
+
+Edit `/etc/postfix/main.cf` — add the Docker subnet to `mynetworks` so it may relay:
+
+```
+myhostname = graffiti-exex.eu
+mydomain = graffiti-exex.eu
+myorigin = $mydomain
+inet_interfaces = all
+mynetworks = 127.0.0.0/8 172.16.0.0/12
+smtpd_relay_restrictions = permit_mynetworks, reject
+```
+
+Reload and test:
+
+```bash
+systemctl reload postfix
+
+# Send a test mail from the host itself
+echo "Test" | mail -s "postfix test" you@example.com
+
+# Simulate what the Docker container does (send from the bridge IP)
+docker compose run --rm app python -c "
+import smtplib
+s = smtplib.SMTP('host-gateway', 25)
+s.sendmail('noreply@graffiti-exex.eu', 'you@example.com', 'Subject: test\n\nworks')
+s.quit()
+print('OK')
+"
+```
+
+Check the mail log if something fails:
+
+```bash
+tail -f /var/log/mail.log
+```
+
+> **SPF / DKIM:** For outgoing mail to avoid spam folders, add an SPF record to your DNS (`v=spf1 a mx ~all`) and optionally configure OpenDKIM. This is outside the scope of this project.
+
+#### Setting up exim4 on Debian (alternative)
+
+```bash
+apt install exim4
+dpkg-reconfigure exim4-config
+# Choose: "internet site", enter your hostname, leave relay networks empty for now
+```
+
+After configuration, allow the Docker subnet to relay by editing `/etc/exim4/exim4.conf.template` or (for split config) `/etc/exim4/conf.d/acl/30_exim4-config_check_rcpt`:
+
+Add `172.16.0.0/12` to `relay_from_hosts` or the `hostlist relay_from_hosts` directive, then:
+
+```bash
+update-exim4.conf
+systemctl restart exim4
+```
+
+Test the same way as with Postfix above.
+
 ### `relay` — Docker Postfix relay container
 
 A lightweight Postfix relay runs as a sidecar container. Activate with `--profile smtp-relay`.

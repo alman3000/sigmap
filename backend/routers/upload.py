@@ -36,12 +36,6 @@ def _process_notify(filepath: str) -> None:
 
 router = APIRouter(prefix="/api/upload", tags=["upload"])
 
-
-@router.get("")
-def check_auth(_: None = Depends(_check_auth)):
-    """Lightweight auth probe — returns 200 if credentials are valid, 401 otherwise."""
-    return {"ok": True}
-
 _ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".heic", ".heif"}
 _MAX_SIZE = 50 * 1024 * 1024  # 50 MB
 
@@ -62,6 +56,12 @@ def _check_auth(authorization: str | None = Header(default=None)) -> None:
             pass
     if not ok:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Falsches Passwort")
+
+
+@router.get("")
+def check_auth(_: None = Depends(_check_auth)):
+    """Lightweight auth probe — returns 200 if credentials are valid, 401 otherwise."""
+    return {"ok": True}
 
 
 class LocateRequest(BaseModel):
