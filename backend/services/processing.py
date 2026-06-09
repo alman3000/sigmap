@@ -1,7 +1,7 @@
 """
 Background processing service:
   - process_uploaded_file   — extract GPS, create thumbnail, store in DB
-  - regenerate_geojson      — rebuild photos_dedubbed.geojson from approved DB records
+  - regenerate_geojson      — rebuild photos.geojson from approved DB records
   - cleanup_orphaned_pending — remove pending-location photos older than N days
   - import_existing_geojson — one-time startup import of pre-existing approved photos
 """
@@ -179,7 +179,7 @@ def register_location(photo_id: int, lat: float, lon: float) -> Optional[str]:
 # ── GeoJSON regeneration ─────────────────────────────────────────────────────
 
 def regenerate_geojson() -> int:
-    """Write approved photos (with tags) to photos_dedubbed.geojson atomically."""
+    """Write approved photos (with tags) to photos.geojson atomically."""
     settings = get_settings()
     db = SessionLocal()
     try:

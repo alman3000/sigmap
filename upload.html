@@ -380,12 +380,30 @@
     return sessionStorage.getItem('upload_pw') || '';
   }
 
-  function unlock() {
+  async function unlock() {
     const pw = document.getElementById('passwordInput').value.trim();
     if (!pw) return;
-    sessionStorage.setItem('upload_pw', pw);
-    document.getElementById('passwordError').textContent = '';
-    showUploadSection();
+    const btn   = document.querySelector('#passwordSection .btn-primary');
+    const errEl = document.getElementById('passwordError');
+    btn.disabled = true;
+    btn.textContent = '…';
+    errEl.textContent = '';
+    try {
+      const r = await fetch('/api/upload', {
+        headers: { 'Authorization': 'Basic ' + btoa('upload:' + pw) },
+      });
+      if (r.ok) {
+        sessionStorage.setItem('upload_pw', pw);
+        showUploadSection();
+      } else {
+        errEl.textContent = 'Falsches Passwort';
+      }
+    } catch {
+      errEl.textContent = 'Verbindungsfehler';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Entsperren';
+    }
   }
 
   function lockAndReset(errorText) {
@@ -407,7 +425,11 @@
     document.getElementById('uploadSection').classList.remove('hidden');
   }
 
-  if (getPassword()) showUploadSection();
+  if (getPassword()) {
+    fetch('/api/upload', {
+      headers: { 'Authorization': 'Basic ' + btoa('upload:' + getPassword()) },
+    }).then(r => { if (r.ok) showUploadSection(); else sessionStorage.removeItem('upload_pw'); });
+  }
 
   document.getElementById('passwordInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') unlock();

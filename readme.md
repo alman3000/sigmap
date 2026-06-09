@@ -114,7 +114,7 @@ graffmap/
 ├── gallery.html                # Paginated photo gallery with infinite scroll
 ├── admin.html                  # Admin moderation panel (magic link login)
 ├── upload.html                 # Password-protected photo upload page
-├── photos_dedubbed.geojson     # Active GeoJSON served to the map
+├── photos.geojson     # Active GeoJSON served to the map
 │
 ├── photos/                     # Original full-resolution photos
 ├── thumbnails/                 # Generated thumbnails (EXIF-corrected)
@@ -155,7 +155,7 @@ graffmap/
 
 ### Option A — Static only (no backend)
 
-Requires pre-generated `photos_dedubbed.geojson`. No upload, no admin panel.
+Requires pre-generated `photos.geojson`. No upload, no admin panel.
 
 ```bash
 python -m http.server 8000
@@ -190,7 +190,7 @@ Services:
 | http://localhost/api/health | Backend health check |
 | http://localhost:8025 | MailHog Web UI (dev profile only) |
 
-On first start the backend automatically imports all features from any existing `photos_dedubbed.geojson` into PostgreSQL with status **approved**, so the map continues to work immediately.
+On first start the backend automatically imports all features from any existing `photos.geojson` into PostgreSQL with status **approved**, so the map continues to work immediately.
 
 ---
 
@@ -214,7 +214,7 @@ python tools/prepare_data.py --help
 
 **Requirements:** Python 3.7+, `pip install pillow`, `exiftool` in PATH.
 
-The script outputs `photos.json` (GPS data) and `photos.geojson`. Copy / rename to `photos_dedubbed.geojson` to serve it on the map.
+The script outputs `photos.json` (GPS data) and `photos.geojson`. Copy / rename to `photos.geojson` to serve it on the map.
 
 > **Note:** After running `prepare_data.py`, trigger thumbnail regeneration via the admin panel (`POST /api/admin/regenerate-thumbnails`) to ensure all thumbnails have correct EXIF orientation.
 
@@ -365,7 +365,7 @@ curl -X POST -b "session=..." http://yourdomain.com/api/admin/regenerate-thumbna
 
 | Problem | Fix |
 |---------|-----|
-| No photos on map | Check browser console; verify `photos_dedubbed.geojson` is readable |
+| No photos on map | Check browser console; verify `photos.geojson` is readable |
 | Gallery shows 0 photos | Photos may still be `pending`; approve them in the admin panel |
 | Admin panel shows "Not authenticated" | Session cookie expired (24 h default) — request a new magic link |
 | Magic link email not arriving | Check `docker logs graffmap-app-1` — the link is always logged as INFO |

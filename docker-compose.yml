@@ -11,7 +11,7 @@ services:
       - ./photos:/app/photos
       - ./thumbnails:/app/thumbnails
       - ./uploads:/app/uploads
-      - ./photos_dedubbed.geojson:/app/photos_dedubbed.geojson
+      - ./photos.geojson:/app/photos.geojson
     env_file: .env
     # Allows SMTP_MODE=host to reach the VPS's own postfix/exim4 on port 25
     extra_hosts:
@@ -52,13 +52,22 @@ services:
       - ./gallery.html:/usr/share/nginx/html/gallery.html:ro
       - ./photos:/usr/share/nginx/html/photos:ro
       - ./thumbnails:/usr/share/nginx/html/thumbnails:ro
-      - ./photos_dedubbed.geojson:/usr/share/nginx/html/photos_dedubbed.geojson:ro
+      - ./photos.geojson:/usr/share/nginx/html/photos.geojson:ro
       - certbot_www:/var/www/certbot:ro
       - certbot_certs:/etc/letsencrypt:ro
     depends_on:
       - app
     networks:
       - internal
+
+  # ── Certbot — run manually to issue/renew TLS certificates ──────────────────
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_certs:/etc/letsencrypt
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done'
+    restart: unless-stopped
 
   # ── SMTP relay container (Option B — only active with --profile smtp-relay) ─
   smtp-relay:

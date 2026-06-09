@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     PENDING_LOCATION_DIR: str = "/app/pending_location"
     PHOTOS_DIR: str = "/app/photos"
     THUMBNAILS_DIR: str = "/app/thumbnails"
-    GEOJSON_PATH: str = "/app/photos_dedubbed.geojson"
+    GEOJSON_PATH: str = "/app/photos.geojson"
     THUMB_SIZE: int = 500
 
     # App
