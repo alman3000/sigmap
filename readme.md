@@ -116,7 +116,8 @@ graffmap/
 ├── admin.html                  # Admin moderation panel (magic link login)
 ├── upload.html                 # Password-protected photo upload page
 ├── photos.geojson              # Active GeoJSON served to the map
-├── backup.sh                   # pg_dump backup script (see Backup & Restore)
+├── tools/
+│   ├── backup.sh                   # pg_dump backup script (see Backup & Restore)
 │
 ├── photos/                     # Original full-resolution photos
 ├── thumbnails/                 # Generated thumbnails (EXIF-corrected)
@@ -446,13 +447,13 @@ Renewals happen automatically — the certbot container runs `certbot renew` eve
 
 ## Backup & Restore
 
-Database data lives in the `postgres_data` Docker volume. Use `backup.sh` to create compressed `pg_dump` snapshots.
+Database data lives in the `postgres_data` Docker volume. Use `tools/backup.sh` to create compressed `pg_dump` snapshots.
 
 ### Create a backup
 
 ```bash
-./backup.sh              # writes backups/<timestamp>.sql.gz, keeps last 14
-./backup.sh --keep 30    # keep last 30 dumps instead
+./tools/backup.sh              # writes backups/<timestamp>.sql.gz, keeps last 14
+./tools/backup.sh --keep 30    # keep last 30 dumps instead
 ```
 
 The script reads credentials from `.env` automatically and rotates old files so the `backups/` directory doesn't grow unbounded. The `backups/` directory is excluded from git.
@@ -462,7 +463,7 @@ The script reads credentials from `.env` automatically and rotates old files so 
 ```bash
 crontab -e
 # Daily at 03:00, keep 30 days of backups:
-0 3 * * * /path/to/sigmap/backup.sh --keep 30 >> /var/log/sigmap-backup.log 2>&1
+0 3 * * * /path/to/sigmap/tools/backup.sh --keep 30 >> /var/log/sigmap-backup.log 2>&1
 ```
 
 ### Restore
