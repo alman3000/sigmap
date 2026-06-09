@@ -265,7 +265,7 @@ SMTP_HOST_PORT=25
 
 ```bash
 apt install postfix libsasl2-modules
-# Choose "Internet Site" when prompted, enter your hostname (e.g. graffiti-exex.eu)
+# Choose "Internet Site" when prompted, enter your hostname (e.g. your-domain.com)
 ```
 
 Find the Docker bridge IP range (typically `172.17.0.0/16` or `172.18.0.0/16`):
@@ -279,11 +279,11 @@ docker network inspect sigmap_internal | grep Subnet
 Edit `/etc/postfix/main.cf` — add the Docker subnet to `mynetworks` so it may relay:
 
 ```
-myhostname = graffiti-exex.eu
-mydomain = graffiti-exex.eu
+myhostname = your-domain.com
+mydomain = your-domain.com
 myorigin = $mydomain
 inet_interfaces = all
-mynetworks = 127.0.0.0/8 172.16.0.0/12
+mynetworks = 172.17.0.0/16 172.18.0.0/16
 smtpd_relay_restrictions = permit_mynetworks, reject
 ```
 
@@ -299,7 +299,7 @@ echo "Test" | mail -s "postfix test" you@example.com
 docker compose run --rm app python -c "
 import smtplib
 s = smtplib.SMTP('host-gateway', 25)
-s.sendmail('noreply@graffiti-exex.eu', 'you@example.com', 'Subject: test\n\nworks')
+s.sendmail('noreply@your-domain.com', 'you@example.com', 'Subject: test\n\nworks')
 s.quit()
 print('OK')
 "
