@@ -2,6 +2,7 @@ import asyncio
 import base64
 import logging
 import os
+import pathlib
 import secrets
 import shutil
 import uuid
@@ -71,7 +72,7 @@ async def upload_photo(
 ):
     settings = get_settings()
 
-    filename = file.filename or "upload.jpg"
+    filename = pathlib.Path(file.filename or "upload.jpg").name
     ext = os.path.splitext(filename)[1].lower()
     if ext not in _ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"Dateiformat nicht unterstützt: {ext}")

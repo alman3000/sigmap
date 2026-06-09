@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from config import get_settings
 from database import init_db
 from routers import admin, auth, photos, upload
 from services.processing import cleanup_orphaned_pending, import_existing_geojson
@@ -26,7 +27,7 @@ app = FastAPI(title="graffmap API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[get_settings().APP_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

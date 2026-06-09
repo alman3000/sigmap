@@ -40,7 +40,7 @@ def request_magic_link(req: EmailRequest, db: Session = Depends(get_db)):
         db.commit()
 
         magic_link = f"{settings.APP_URL}/api/auth/verify?token={token}"
-        logger.info("Magic link for %s: %s", email, magic_link)
+        logger.info("Magic link requested for %s", email)
         try:
             send_magic_link_email(email, magic_link)
         except Exception as exc:
