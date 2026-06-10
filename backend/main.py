@@ -68,6 +68,21 @@ def list_tags(db: Session = Depends(get_db)):
     return {"tags": merged or VALID_TAGS}
 
 
+@app.get("/api/months")
+def list_months(db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(
+            text(
+                "SELECT SUBSTRING(datetime_original, 1, 7) AS ym, COUNT(*) AS cnt "
+                "FROM photos WHERE status = 'approved' AND datetime_original != '' "
+                "GROUP BY ym ORDER BY ym"
+            )
+        ).fetchall()
+        return {"months": [{"month": r[0], "count": r[1]} for r in rows]}
+    except Exception:
+        return {"months": []}
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok"}

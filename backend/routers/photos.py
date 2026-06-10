@@ -15,6 +15,7 @@ def list_photos(
     limit: int = Query(100, ge=1, le=200),
     tags: str = Query(""),
     sort: str = Query("desc"),
+    month: str = Query(""),
     db: Session = Depends(get_db),
 ):
     q = db.query(Photo).filter(Photo.status == PhotoStatus.approved)
@@ -25,6 +26,9 @@ def list_photos(
             Photo.tags.cast(JSONB).op("@>")(cast([t], JSONB))
             for t in tag_list
         ]))
+
+    if month:
+        q = q.filter(Photo.datetime_original.like(f"{month}%"))
 
     total = q.count()
 

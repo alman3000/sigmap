@@ -48,15 +48,46 @@
     }
     .nav-btn:hover { background: var(--border); }
 
-    /* ── Filter bar ───────────────────────────────────────────────────────── */
+    /* ── Filter area (sticky wrapper) ────────────────────────────────────── */
+    #filter-area {
+      position: sticky; top: 49px; z-index: 90;
+      background: rgba(26,26,26,.97); backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
     #filter-bar {
       padding: 10px 24px;
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-      border-bottom: 1px solid var(--border);
-      position: sticky; top: 49px; z-index: 90;
-      background: rgba(26,26,26,.97); backdrop-filter: blur(10px);
     }
-    .filter-label { font-size: 12px; color: var(--muted); font-weight: 600; }
+    #filter-divider {
+      width: 1px; height: 18px; background: var(--border);
+      align-self: center; flex-shrink: 0; margin: 0 2px;
+    }
+    #month-row {
+      padding: 6px 24px 8px;
+      display: flex; flex-wrap: wrap; gap: 4px;
+      border-top: 1px solid var(--border);
+    }
+    #month-row.hidden { display: none; }
+    .filter-label { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+
+    /* ── Date filter chips (year / month) ────────────────────────────────── */
+
+    .year-chip {
+      padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+      cursor: pointer; border: 1px solid var(--border);
+      background: var(--bg3); color: var(--muted); transition: all .15s; user-select: none;
+    }
+    .year-chip:hover  { border-color: var(--amber); color: var(--text); }
+    .year-chip.expanded { background: #2a2a1a; border-color: var(--amber); color: var(--amber); }
+    .year-chip.active   { background: #3a2a1a; border-color: var(--amber); color: var(--amber); font-weight: 700; }
+
+    .month-chip {
+      padding: 3px 9px; border-radius: 20px; font-size: 11px;
+      cursor: pointer; border: 1px solid var(--border);
+      background: var(--bg3); color: var(--muted); transition: all .15s; user-select: none;
+    }
+    .month-chip:hover  { border-color: var(--amber); color: var(--text); }
+    .month-chip.active { background: #3a2a1a; border-color: var(--amber); color: var(--amber); font-weight: 700; }
 
     .tag-pill {
       padding: 4px 12px; border-radius: 20px; font-size: 12px;
@@ -228,9 +259,12 @@
   <a class="nav-btn" href="/">🗺 Karte</a>
 </header>
 
-<div id="filter-bar">
-  <span class="filter-label">Tags:</span>
-  <button id="sort-btn">⬇ Neueste zuerst</button>
+<div id="filter-area">
+  <div id="filter-bar">
+    <span class="filter-label">Tags:</span>
+    <button id="sort-btn">⬇ Neueste zuerst</button>
+  </div>
+  <div id="month-row" class="hidden"></div>
 </div>
 
 <main id="gallery-main">
@@ -254,13 +288,15 @@
   let lbElements  = [];   // mirrors allPhotos for GLightbox
   const monthSections = new Map(); // monthKey → { grid, hdr, count, label }
 
-  let offset    = 0;
-  let total     = null;
-  let hasMore   = true;
-  let loading   = false;
-  let activeTags = new Set();
-  let sortAsc   = false;
-  let abortCtrl = null;
+  let offset       = 0;
+  let total        = null;
+  let hasMore      = true;
+  let loading      = false;
+  let activeTags   = new Set();
+  let activePeriod = null;   // "YYYY:MM" from /api/months
+  let expandedYear = null;
+  let sortAsc      = false;
+  let abortCtrl    = null;
 
   const main          = document.getElementById('gallery-main');
   const pageLoadingEl = document.getElementById('page-loading');
@@ -306,8 +342,17 @@
 
   function updateStats() {
     if (total === null) return;
+    const parts = [];
+    if (activeTags.size) parts.push([...activeTags].join(', '));
+    if (activePeriod) parts.push(formatPeriodLabel(activePeriod));
     document.getElementById('stats-bar').textContent =
-      total.toLocaleString('de-DE') + ' Fotos' + (activeTags.size ? ' (gefiltert)' : '');
+      total.toLocaleString('de-DE') + ' Fotos' + (parts.length ? ' · ' + parts.join(' · ') : '');
+  }
+
+  function formatPeriodLabel(period) {
+    const parts = period.split(':');
+    if (parts.length === 1) return parts[0];
+    return MONTH_NAMES[parseInt(parts[1]) - 1] + ' ' + parts[0];
   }
 
   // ── Tag filter UI ─────────────────────────────────────────────────────────
@@ -325,6 +370,79 @@
         reset();
       });
       bar.insertBefore(btn, sortBtn);
+    });
+  }
+
+  // ── Date filter UI ───────────────────────────────────────────────────────
+
+  function buildDateFilter(monthsByYear) {
+    const bar      = document.getElementById('filter-bar');
+    const sortBtn  = document.getElementById('sort-btn');
+    const monthRow = document.getElementById('month-row');
+    if (!Object.keys(monthsByYear).length) return;
+
+    // Divider + label inserted before sort button
+    const divider = document.createElement('span');
+    divider.id = 'filter-divider';
+    bar.insertBefore(divider, sortBtn);
+
+    const label = document.createElement('span');
+    label.className = 'filter-label';
+    label.textContent = 'Datum:';
+    bar.insertBefore(label, sortBtn);
+
+    function refreshChipStates() {
+      bar.querySelectorAll('.year-chip').forEach(c => {
+        const yr = c.dataset.year;
+        const isActive   = activePeriod === yr || (activePeriod && activePeriod.startsWith(yr + ':'));
+        const isExpanded = yr === expandedYear && !isActive;
+        c.classList.toggle('active',   isActive);
+        c.classList.toggle('expanded', isExpanded);
+      });
+      monthRow.querySelectorAll('.month-chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.period === activePeriod);
+      });
+    }
+
+    Object.keys(monthsByYear).sort().forEach(year => {
+      const chip = document.createElement('span');
+      chip.className = 'year-chip';
+      chip.textContent = year;
+      chip.dataset.year = year;
+
+      chip.addEventListener('click', () => {
+        if (expandedYear === year && activePeriod === year) {
+          // Click active year again → clear everything
+          expandedYear = null;
+          activePeriod = null;
+          monthRow.innerHTML = '';
+          monthRow.classList.add('hidden');
+        } else {
+          // Switch to this year: expand months + filter to year
+          expandedYear = year;
+          activePeriod = year;
+          monthRow.innerHTML = '';
+          (monthsByYear[year] || []).forEach(m => {
+            const mc = document.createElement('span');
+            mc.className = 'month-chip';
+            mc.textContent = formatPeriodLabel(m.month);
+            mc.dataset.period = m.month;
+            mc.addEventListener('click', e => {
+              e.stopPropagation();
+              // Toggle month: if same month clicked, go back to year filter
+              activePeriod = activePeriod === m.month ? year : m.month;
+              refreshChipStates();
+              reset();
+            });
+            monthRow.appendChild(mc);
+          });
+          monthRow.classList.remove('hidden');
+        }
+        refreshChipStates();
+        reset();
+      });
+
+      bar.insertBefore(chip, sortBtn);
     });
   }
 
@@ -487,6 +605,7 @@
 
     const p = new URLSearchParams({ offset, limit: LIMIT, sort: sortAsc ? 'asc' : 'desc' });
     if (activeTags.size) p.set('tags', [...activeTags].join(','));
+    if (activePeriod)    p.set('month', activePeriod);
 
     try {
       const r = await fetch('/api/photos?' + p, { signal: abortCtrl.signal });
@@ -560,7 +679,21 @@
       const fetched = (await (await fetch('/api/tags')).json()).tags;
       if (Array.isArray(fetched) && fetched.length) TAGS = fetched;
     } catch {}
+
+    const monthsByYear = {};
+    try {
+      const months = (await (await fetch('/api/months')).json()).months;
+      if (Array.isArray(months)) {
+        months.forEach(m => {
+          const year = m.month.split(':')[0];
+          if (!monthsByYear[year]) monthsByYear[year] = [];
+          monthsByYear[year].push(m);
+        });
+      }
+    } catch {}
+
     buildTagFilter();
+    buildDateFilter(monthsByYear);
     loadPage();
   })();
 </script>
