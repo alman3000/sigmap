@@ -90,9 +90,11 @@
       cursor: pointer;
       font-size: .95rem;
       font-weight: 600;
-      padding: .55rem 1.2rem;
+      padding: .55rem .9rem;
       transition: background .15s;
       white-space: nowrap;
+      flex-shrink: 0;
+      font-size: 1.1rem;
     }
     .btn-primary:hover { background: #fbbf24; }
     .btn-primary:disabled { background: #78350f; color: #6b7280; cursor: not-allowed; }
@@ -352,6 +354,30 @@
     .summary .err { color: #ef4444; }
 
     .hidden { display: none !important; }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 1.25rem .75rem 3rem;
+      }
+      #dropZone {
+        padding: 2rem 1rem;
+      }
+      .file-row {
+        grid-template-columns: 1fr auto;
+      }
+      .file-size {
+        display: none;
+      }
+      .file-status {
+        grid-column: 2;
+        grid-row: 1;
+        min-width: unset;
+      }
+      .progress-wrap {
+        grid-column: 1 / -1;
+        grid-row: 2;
+      }
+    }
   </style>
 </head>
 <body>
@@ -364,11 +390,9 @@
 <!-- ── Password gate ──────────────────────────────────────────────────────── -->
 <div id="passwordSection">
   <div class="card">
-    <div class="lock-icon">🔒</div>
-    <p>Gib das Upload-Passwort ein</p>
     <div class="input-row">
       <input type="password" id="passwordInput" placeholder="Passwort" autocomplete="current-password" />
-      <button class="btn-primary" onclick="unlock()">Entsperren</button>
+      <button class="btn-primary" onclick="unlock()">🔒</button>
     </div>
     <div id="passwordError" class="error-msg"></div>
   </div>
@@ -468,7 +492,7 @@
       errEl.textContent = 'Verbindungsfehler';
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Entsperren';
+      btn.textContent = '🔒';
     }
   }
 

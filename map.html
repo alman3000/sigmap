@@ -410,6 +410,12 @@
       gap: 6px;
       flex-shrink: 0;
     }
+    .controls-buttons {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
     .tag-filter-label {
       font-size: 12px;
       color: #707070;
@@ -438,6 +444,46 @@
       font-weight: 600;
     }
 
+  @media (max-width: 600px) {
+    #controls {
+      padding: 8px 12px;
+    }
+    .controls-inner {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .slider-wrapper {
+      flex: 0 0 100%;
+    }
+    .tag-filter-row {
+      flex: 0 0 100%;
+      flex-wrap: wrap;
+    }
+    #stats {
+      min-width: unset;
+      font-size: 11px;
+      flex: 1;
+    }
+    .random-button, .view-toggle-button {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+    .years-row {
+      flex-wrap: wrap;
+    }
+    .popup-img, .popup-loading {
+      width: 160px;
+      height: 160px;
+    }
+    .leaflet-popup-content:not(:has(.cluster-popup)) {
+      max-width: calc(100vw - 80px);
+    }
+    .cluster-popup {
+      min-width: unset;
+      max-width: calc(100vw - 60px);
+    }
+  }
+
   </style>
 </head>
 <body>
@@ -464,9 +510,11 @@
         <div id="tagFilterSection" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
       </div>
       <div id="stats">Loading...</div>
-      <button class="view-toggle-button" id="viewToggle">🔥 Heatmap</button>
-      <button class="random-button" id="randomButton">Random</button>
-      <a href="/gallery.html" class="view-toggle-button" style="text-decoration:none">📷 Galerie</a>
+      <div class="controls-buttons">
+        <button class="view-toggle-button" id="viewToggle">🔥 Heatmap</button>
+        <button class="random-button" id="randomButton">Random</button>
+        <a href="/gallery.html" class="view-toggle-button" style="text-decoration:none">📷 Galerie</a>
+      </div>
     </div>
   </div>
 
