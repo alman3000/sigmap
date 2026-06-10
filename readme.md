@@ -423,6 +423,12 @@ curl -X POST -b "session=..." http://yourdomain.com/api/admin/regenerate-thumbna
 
 ---
 
+## Branding
+
+Put a logo.png and a favicon.ico file in the projects root. Logo will appear on the top right of the map.
+
+---
+
 ## HTTPS on a VPS
 
 The stack includes a `certbot` container that shares the same Docker volumes as nginx — this is required because nginx reads from a named volume (`certbot_www`), not from the host filesystem.

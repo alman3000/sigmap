@@ -51,6 +51,7 @@ services:
       - ./upload.html:/usr/share/nginx/html/upload.html:ro
       - ./gallery.html:/usr/share/nginx/html/gallery.html:ro
       - ./logo.png:/usr/share/nginx/html/logo.png:ro
+      - ./favicon.ico:/usr/share/nginx/html/favicon.ico:ro
       - ./photos:/usr/share/nginx/html/photos:ro
       - ./thumbnails:/usr/share/nginx/html/thumbnails:ro
       - ./photos.geojson:/usr/share/nginx/html/photos.geojson:ro

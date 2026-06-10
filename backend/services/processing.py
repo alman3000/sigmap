@@ -230,40 +230,50 @@ def _regenerate_geojson_locked() -> int:
 # ── startup import from existing GeoJSON ─────────────────────────────────────
 
 def import_existing_geojson() -> None:
-    """On first start, import all features from existing GeoJSON as approved photos."""
+    """Import new photos from GeoJSON and back-fill tags for DB photos that have none."""
     settings = get_settings()
     if not os.path.exists(settings.GEOJSON_PATH):
         return
 
     db = SessionLocal()
     try:
-        if db.query(Photo).count() > 0:
-            return  # Already populated
-
         with open(settings.GEOJSON_PATH, "r", encoding="utf-8") as f:
             geojson = json.load(f)
 
+        existing = {p.filename: p for p in db.query(Photo).all()}
         imported = 0
+        updated = 0
+
         for feature in geojson.get("features", []):
             props = feature.get("properties", {})
             coords = (feature.get("geometry") or {}).get("coordinates", [None, None])
             filename = props.get("filename")
             if not filename or coords[0] is None:
                 continue
-            db.add(Photo(
-                filename=filename,
-                path=os.path.join(settings.PHOTOS_DIR, filename),
-                thumb_path=os.path.join(settings.THUMBNAILS_DIR, filename),
-                lat=float(coords[1]),
-                lon=float(coords[0]),
-                datetime_original=props.get("datetime", ""),
-                tags=props.get("tags", []),
-                status=PhotoStatus.approved,
-            ))
-            imported += 1
+
+            geojson_tags = props.get("tags") or []
+
+            if filename in existing:
+                photo = existing[filename]
+                if not (photo.tags or []) and geojson_tags:
+                    photo.tags = geojson_tags
+                    updated += 1
+            else:
+                db.add(Photo(
+                    filename=filename,
+                    path=os.path.join(settings.PHOTOS_DIR, filename),
+                    thumb_path=os.path.join(settings.THUMBNAILS_DIR, filename),
+                    lat=float(coords[1]),
+                    lon=float(coords[0]),
+                    datetime_original=props.get("datetime", ""),
+                    tags=geojson_tags,
+                    status=PhotoStatus.approved,
+                ))
+                imported += 1
 
         db.commit()
-        logger.info("Imported %d existing photos from GeoJSON as approved", imported)
+        if imported or updated:
+            logger.info("GeoJSON sync: %d imported, %d tags back-filled", imported, updated)
     except Exception as exc:
         logger.error("Failed to import existing GeoJSON: %s", exc)
         db.rollback()

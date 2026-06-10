@@ -1,11 +1,13 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from config import get_settings
-from database import init_db
+from database import get_db, init_db
 from routers import admin, auth, photos, upload
 from services.processing import cleanup_orphaned_pending, import_existing_geojson
 from tags import VALID_TAGS
@@ -48,8 +50,22 @@ app.include_router(admin.router)
 
 
 @app.get("/api/tags")
-def list_tags():
-    return {"tags": VALID_TAGS}
+def list_tags(db: Session = Depends(get_db)):
+    try:
+        rows = db.execute(
+            text(
+                "SELECT DISTINCT tag FROM "
+                "(SELECT jsonb_array_elements_text(tags::jsonb) AS tag "
+                " FROM photos WHERE status = 'approved') sub "
+                "WHERE tag IS NOT NULL AND tag != '' ORDER BY tag"
+            )
+        ).fetchall()
+        db_tags = [r[0] for r in rows]
+    except Exception:
+        db_tags = []
+    seen = set(db_tags)
+    merged = db_tags + [t for t in VALID_TAGS if t not in seen]
+    return {"tags": merged or VALID_TAGS}
 
 
 @app.get("/api/health")

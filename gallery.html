@@ -557,8 +557,8 @@
 
   (async function() {
     try {
-      const r = await fetch('/api/tags');
-      TAGS = (await r.json()).tags;
+      const fetched = (await (await fetch('/api/tags')).json()).tags;
+      if (Array.isArray(fetched) && fetched.length) TAGS = fetched;
     } catch {}
     buildTagFilter();
     loadPage();

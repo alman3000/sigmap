@@ -36,4 +36,5 @@ desktop.ini
 .env
 todo.md
 logo.png
+favicon.ico
 docker-compose.override.yml

@@ -1,5 +1,3 @@
-import json as _json
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import asc, cast, desc, func, nulls_last, or_
 from sqlalchemy.dialects.postgresql import JSONB
@@ -7,7 +5,6 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Photo, PhotoStatus
-from tags import VALID_TAGS
 
 router = APIRouter(prefix="/api/photos", tags=["photos"])
 
@@ -22,10 +19,10 @@ def list_photos(
 ):
     q = db.query(Photo).filter(Photo.status == PhotoStatus.approved)
 
-    tag_list = [t for t in (t.strip() for t in tags.split(",")) if t in VALID_TAGS]
+    tag_list = [t for t in (t.strip() for t in tags.split(",")) if t and len(t) <= 50]
     if tag_list:
         q = q.filter(or_(*[
-            Photo.tags.cast(JSONB).op("@>")(cast(_json.dumps([t]), JSONB))
+            Photo.tags.cast(JSONB).op("@>")(cast([t], JSONB))
             for t in tag_list
         ]))
 
