@@ -159,6 +159,30 @@ def update_location(
     return {"id": photo_id, "lat": body.lat, "lon": body.lon}
 
 
+@router.delete("/photos/{photo_id}")
+def delete_photo(
+    photo_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    _: str = Depends(get_current_admin),
+):
+    photo = db.get(Photo, photo_id)
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    for path in (photo.path, photo.thumb_path):
+        if path and os.path.exists(path):
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+
+    db.delete(photo)
+    db.commit()
+    background_tasks.add_task(regenerate_geojson)
+    return {"id": photo_id, "deleted": True}
+
+
 @router.post("/regenerate")
 def trigger_regenerate(
     background_tasks: BackgroundTasks,

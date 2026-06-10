@@ -159,6 +159,15 @@
     }
     .gps-btn:hover { background: var(--amber); color: #1a1a1a; }
 
+    .delete-btn {
+      width: 100%; padding: 5px 0; border-radius: 5px; font-size: 12px;
+      font-weight: 600; cursor: pointer; border: 1px solid var(--red);
+      background: transparent; color: var(--red); transition: all .15s;
+    }
+    .delete-btn:hover:not(:disabled) { background: var(--red); color: #fff; }
+    .delete-btn.confirm { background: var(--red); color: #fff; }
+    .delete-btn:disabled { opacity: .4; cursor: not-allowed; }
+
     /* ── load more ─────────────────────────────────────────────────────── */
     #load-more-row {
       text-align: center; padding: 24px;
@@ -563,6 +572,50 @@ function buildCard(photo) {
   });
 
   body.appendChild(actions);
+
+  // Delete button (two-click confirmation)
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'delete-btn';
+  deleteBtn.textContent = '🗑 Löschen';
+  let deleteConfirm = false;
+  let deleteTimer;
+  deleteBtn.addEventListener('click', async () => {
+    if (!deleteConfirm) {
+      deleteConfirm = true;
+      deleteBtn.textContent = 'Sicher? Nochmal klicken';
+      deleteBtn.classList.add('confirm');
+      deleteTimer = setTimeout(() => {
+        deleteConfirm = false;
+        deleteBtn.classList.remove('confirm');
+        deleteBtn.textContent = '🗑 Löschen';
+      }, 3000);
+      return;
+    }
+    clearTimeout(deleteTimer);
+    deleteBtn.disabled = true;
+    deleteBtn.textContent = '…';
+    try {
+      const r = await fetch(`/api/admin/photos/${photo.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (r.ok) {
+        card.remove();
+        toast('Gelöscht', 'ok');
+        loadStats();
+      } else {
+        toast('Fehler beim Löschen', 'err');
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = '🗑 Löschen';
+      }
+    } catch {
+      toast('Verbindungsfehler', 'err');
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = '🗑 Löschen';
+    }
+  });
+  body.appendChild(deleteBtn);
+
   card.appendChild(body);
   return card;
 }
