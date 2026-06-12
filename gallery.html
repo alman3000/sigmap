@@ -164,6 +164,8 @@
       display: flex;
       flex-direction: column;
       gap: 3px;
+      background: var(--bg3);
+      border-top: 1px solid var(--border);
     }
 
     .tile-footer-row {
@@ -458,10 +460,6 @@
     const sigHref    = photo.lat != null
       ? `/?lat=${photo.lat.toFixed(6)}&lng=${photo.lon.toFixed(6)}&zoom=18${monthParam}&file=${encodeURIComponent(photo.filename)}`
       : null;
-    const gHref      = photo.lat != null
-      ? `https://maps.google.com/?q=${photo.lat.toFixed(6)},${photo.lon.toFixed(6)}`
-      : null;
-
     return `<div class="lb-caption">
       <div class="lb-top">
         <span class="lb-filename">${esc(photo.filename)}</span>
@@ -470,7 +468,6 @@
       </div>
       ${sigHref ? `<div class="lb-links">
         <a class="lb-link" href="${sigHref}">📍 Karte</a>
-        <a class="lb-link" href="${esc(gHref)}" target="_blank" rel="noopener noreferrer">🗺 GMaps</a>
       </div>` : ''}
     </div>`;
   }
@@ -522,15 +519,6 @@
       sigLink.title       = 'Auf graffmap-Karte anzeigen';
       sigLink.textContent = 'Karte';
       links.appendChild(sigLink);
-
-      const gLink = document.createElement('a');
-      gLink.className   = 'tile-map-link';
-      gLink.href        = `https://maps.google.com/?q=${photo.lat.toFixed(6)},${photo.lon.toFixed(6)}`;
-      gLink.target      = '_blank';
-      gLink.rel         = 'noopener noreferrer';
-      gLink.title       = 'Bei Google Maps öffnen';
-      gLink.textContent = 'GMaps';
-      links.appendChild(gLink);
 
       row.appendChild(links);
     }
