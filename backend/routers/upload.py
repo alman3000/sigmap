@@ -17,6 +17,7 @@ from tags import VALID_TAGS
 from services.mail import send_new_photo_notification
 from services.processing import (
     _create_thumbnail,
+    _extract_datetime,
     _extract_gps,
     process_uploaded_file,
     regenerate_geojson,
@@ -121,8 +122,9 @@ async def upload_photo(
         pending_dest = os.path.join(pending_dir, filename)
         shutil.move(dest, pending_dest)
 
-        thumb = await loop.run_in_executor(
-            None, _create_thumbnail, pending_dest, settings.THUMBNAILS_DIR, settings.THUMB_SIZE
+        thumb, dt = await asyncio.gather(
+            loop.run_in_executor(None, _create_thumbnail, pending_dest, settings.THUMBNAILS_DIR, settings.THUMB_SIZE),
+            loop.run_in_executor(None, _extract_datetime, pending_dest),
         )
 
         db = SessionLocal()
@@ -133,7 +135,7 @@ async def upload_photo(
                 thumb_path=thumb,
                 lat=None,
                 lon=None,
-                datetime_original="",
+                datetime_original=dt,
                 tags=tag_list,
                 status=PhotoStatus.pending,
             )

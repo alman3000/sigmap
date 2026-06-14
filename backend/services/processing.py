@@ -29,12 +29,36 @@ SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".heic", ".heif"}
 
 # ── GPS / EXIF extraction ────────────────────────────────────────────────────
 
+def _extract_datetime(filepath: str) -> str:
+    """Return DateTimeOriginal from EXIF, falling back to FileModifyDate."""
+    cmd = [
+        "exiftool", "-n", "-fast2",
+        "-datetimeoriginal", "-filemodifydate",
+        "-charset", "UTF8",
+        "-json", filepath,
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode == 0 and result.stdout.strip():
+            data = json.loads(result.stdout)
+            if data:
+                dt = data[0].get("DateTimeOriginal", "")
+                if dt:
+                    return dt
+                fmd = data[0].get("FileModifyDate", "")
+                if fmd:
+                    return fmd[:19]  # strip timezone: "2026:06:13 16:42:03+00:00" → "2026:06:13 16:42:03"
+    except Exception as exc:
+        logger.warning("exiftool datetime extraction failed for %s: %s", filepath, exc)
+    return ""
+
+
 def _extract_gps(filepath: str) -> Optional[dict]:
     cmd = [
         "exiftool", "-n", "-fast2",
         "-if", "$GPSLatitude",
         "-gpslatitude", "-gpslongitude",
-        "-datetimeoriginal", "-filename", "-SourceFile",
+        "-datetimeoriginal", "-filemodifydate", "-filename", "-SourceFile",
         "-charset", "UTF8",
         "-json", filepath,
     ]
@@ -43,7 +67,10 @@ def _extract_gps(filepath: str) -> Optional[dict]:
         if result.returncode == 0 and result.stdout.strip():
             data = json.loads(result.stdout)
             if data and data[0].get("GPSLatitude") and data[0].get("GPSLongitude"):
-                return data[0]
+                d = data[0]
+                if not d.get("DateTimeOriginal") and d.get("FileModifyDate"):
+                    d["DateTimeOriginal"] = d["FileModifyDate"][:19]
+                return d
     except Exception as exc:
         logger.warning("exiftool failed for %s: %s", filepath, exc)
     return None

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import asc, cast, desc, func, nulls_last, or_
+from sqlalchemy import asc, cast, desc, func, or_
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
 
@@ -32,9 +32,12 @@ def list_photos(
 
     total = q.count()
 
-    date_col = func.nullif(Photo.datetime_original, "")
     order_fn = asc if sort == "asc" else desc
-    q = q.order_by(nulls_last(order_fn(date_col)), order_fn(Photo.created_at))
+    effective_date = func.coalesce(
+        func.nullif(Photo.datetime_original, ""),
+        func.to_char(Photo.created_at, "YYYY:MM:DD HH24:MI:SS"),
+    )
+    q = q.order_by(order_fn(effective_date))
 
     photos = q.offset(offset).limit(limit).all()
 
